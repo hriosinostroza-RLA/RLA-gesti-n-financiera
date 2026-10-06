@@ -2,8 +2,8 @@ import os
 from datetime import datetime
 from dateutil.relativedelta import relativedelta
 from flask import Flask, render_template, request, redirect, url_for, flash
-import psycopg2
-from psycopg2.extras import RealDictCursor
+import psycopg
+from psycopg.rows import dict_row
 
 app = Flask(__name__)
 app.secret_key = 'clave_secreta_para_flash'
@@ -20,7 +20,8 @@ def formato_clp(valor):
         return "$0"
 
 def obtener_conexion():
-    conn = psycopg2.connect(DATABASE_URL, cursor_factory=RealDictCursor)
+    # psycopg 3 usa 'row_factory=dict_row' en lugar de cursor_factory
+    conn = psycopg.connect(DATABASE_URL, row_factory=dict_row)
     return conn
 
 @app.route('/')
