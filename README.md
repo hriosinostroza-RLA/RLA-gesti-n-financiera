@@ -1,2 +1,2 @@
-# RLA-ADM.FINACIERA
+# RLA-ADMINISTRACION
 Sistema de gestión financiera para servicios técnicos RLA.
