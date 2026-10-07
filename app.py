@@ -34,8 +34,8 @@ def index():
         print(f"Error al consultar Supabase: {e}")
 
     # Cálculos dinámicos para las tarjetas del panel financiero
-    total_ingresos = sum(float(item.get('monto_neto', 0)) for item in datos if item.get('estado') == 'Pagado')
-    por_cobrar = sum(float(item.get('monto_neto', 0)) for item in datos if item.get('estado') != 'Pagado')
+    total_ingresos = sum(float(item.get('monto_neto', 0)) for item in datos if str(item.get('estado', '')).lower() in ['pagado', 'completado'])
+    total_pendientes = sum(float(item.get('monto_neto', 0)) for item in datos if str(item.get('estado', '')).lower() not in ['pagado', 'completado'])
     egresos = sum(float(item.get('gastos_op', 0)) for item in datos)
     capital_disponible = total_ingresos - egresos
 
@@ -43,7 +43,8 @@ def index():
         'index.html',
         datos=datos,
         total_ingresos=total_ingresos,
-        por_cobrar=por_cobrar,
+        total_pendientes=total_pendientes,
+        por_cobrar=total_pendientes,  # Alias por si tu HTML usa por_cobrar
         egresos=egresos,
         capital_disponible=capital_disponible
     )
