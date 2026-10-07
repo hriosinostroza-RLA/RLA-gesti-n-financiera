@@ -2,13 +2,13 @@ import os
 from datetime import datetime
 from dateutil.relativedelta import relativedelta
 from flask import Flask, render_template, request, redirect, url_for, flash
-import psycopg
-from psycopg.rows import dict_row
+import psycopg2
+from psycopg2.extras import RealDictCursor
 
 app = Flask(__name__)
 app.secret_key = 'clave_secreta_para_flash'
 
-# URL de conexión a Supabase (PostgreSQL) o fallback local
+# URL de conexión a Supabase (PostgreSQL) usando variables de entorno o fallback directo
 DATABASE_URL = os.environ.get('https://wdwxzftbpqdnesrzpzmq.supabase.co', 'postgresql://postgres:eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Indkd3h6ZnRicHFkbmVzcnpwem1xIiwicm9sZSI6ImFub24iLCJpYXQiOjE3OTEzMjYxNjIsImV4cCI6MjEwNjkwMjE2Mn0.MnkwqiHPYgBi7_pr3xylvRpo8OTrA6pOPh6aPqMLHBQ')
 
 @app.template_filter('clp')
@@ -20,8 +20,7 @@ def formato_clp(valor):
         return "$0"
 
 def obtener_conexion():
-    # psycopg 3 usa 'row_factory=dict_row' en lugar de cursor_factory
-    conn = psycopg.connect(DATABASE_URL, row_factory=dict_row)
+    conn = psycopg2.connect(DATABASE_URL, cursor_factory=RealDictCursor)
     return conn
 
 @app.route('/')
