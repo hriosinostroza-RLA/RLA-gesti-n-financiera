@@ -1,4 +1,5 @@
 import os
+from datetime import datetime, date
 from flask import Flask, render_template, request, redirect, url_for
 from supabase import create_client, Client
 
@@ -22,6 +23,7 @@ def formato_clp(value):
 @app.route('/')
 def index():
     datos = []
+    hoy = date.today()
     try:
         response = supabase.table("trabajos").select("*").execute()
         if response.data:
@@ -29,14 +31,26 @@ def index():
                 neto_val = float(item.get('neto') if item.get('neto') is not None else item.get('monto_neto', 0))
                 item['neto'] = neto_val
                 item['monto_neto'] = neto_val
-                # Calculamos el 19% de IVA por cada registro
                 item['iva'] = neto_val * 0.19
                 item['total_bruto'] = neto_val * 1.19
+                
+                # Verificamos si han pasado 30 días o menos desde la fecha del trabajo
+                fecha_str = item.get('fecha', '')
+                editable = False
+                if fecha_str:
+                    try:
+                        f_trabajo = datetime.strptime(fecha_str.split('T')[0], '%Y-%m-%d').date()
+                        dias_transcurridos = (hoy - f_trabajo).days
+                        if 0 <= dias_transcurridos <= 30:
+                            editable = True
+                    except Exception:
+                        pass
+                item['editable'] = editable
+
             datos = response.data
     except Exception as e:
         print(f"Error al consultar Supabase: {e}")
 
-    # Ingresos con IVA incluido (Bruto) para los pagados/completados
     total_ingresos = sum(float(item.get('total_bruto', 0)) for item in datos if str(item.get('estado', '')).lower() in ['pagado', 'completado'])
     total_pendientes = sum(float(item.get('total_bruto', 0)) for item in datos if str(item.get('estado', '')).lower() not in ['pagado', 'completado'])
     egresos = sum(float(item.get('gastos_op') or 0) for item in datos)
@@ -72,6 +86,14 @@ def agregar_trabajo():
     except Exception as e:
         print(f"Error al guardar el trabajo en Supabase: {e}")
     
+    return redirect(url_for('index'))
+
+@app.route('/marcar_pagado/<int:id>', methods=['POST'])
+def marcar_pagado(id):
+    try:
+        supabase.table("trabajos").update({"estado": "Pagado"}).eq("id", id).execute()
+    except Exception as e:
+        print(f"Error al actualizar estado a pagado: {e}")
     return redirect(url_for('index'))
 
 @app.route('/agregar_gasto', methods=['POST'])
