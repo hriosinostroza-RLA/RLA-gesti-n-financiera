@@ -4,17 +4,14 @@ from supabase import create_client, Client
 
 app = Flask(__name__)
 
-# Credenciales de Supabase mediante API HTTP
 SUPABASE_URL = os.environ.get("SUPABASE_URL", "")
 SUPABASE_KEY = os.environ.get("SUPABASE_KEY", "")
 
-# Rescate automático por si se configuró en DATABASE_URL por error
 if not SUPABASE_URL and os.environ.get("DATABASE_URL", "").startswith("http"):
     SUPABASE_URL = os.environ.get("DATABASE_URL")
 
 supabase: Client = create_client(SUPABASE_URL, SUPABASE_KEY)
 
-# Filtro personalizado para moneda chilena ($) con formato de puntos
 @app.template_filter('clp')
 def formato_clp(value):
     try:
@@ -29,17 +26,19 @@ def index():
         response = supabase.table("trabajos").select("*").execute()
         if response.data:
             for item in response.data:
-                # Aseguramos que ambas claves existan para que el HTML y Supabase no fallen
-                neto_val = item.get('neto') if item.get('neto') is not None else item.get('monto_neto', 0)
+                neto_val = float(item.get('neto') if item.get('neto') is not None else item.get('monto_neto', 0))
                 item['neto'] = neto_val
                 item['monto_neto'] = neto_val
+                # Calculamos el 19% de IVA por cada registro
+                item['iva'] = neto_val * 0.19
+                item['total_bruto'] = neto_val * 1.19
             datos = response.data
     except Exception as e:
         print(f"Error al consultar Supabase: {e}")
 
-    # Cálculos dinámicos con la clave unificada
-    total_ingresos = sum(float(item.get('monto_neto') or 0) for item in datos if str(item.get('estado', '')).lower() in ['pagado', 'completado'])
-    total_pendientes = sum(float(item.get('monto_neto') or 0) for item in datos if str(item.get('estado', '')).lower() not in ['pagado', 'completado'])
+    # Ingresos con IVA incluido (Bruto) para los pagados/completados
+    total_ingresos = sum(float(item.get('total_bruto', 0)) for item in datos if str(item.get('estado', '')).lower() in ['pagado', 'completado'])
+    total_pendientes = sum(float(item.get('total_bruto', 0)) for item in datos if str(item.get('estado', '')).lower() not in ['pagado', 'completado'])
     egresos = sum(float(item.get('gastos_op') or 0) for item in datos)
     capital_disponible = total_ingresos - egresos
 
