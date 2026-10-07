@@ -20,7 +20,7 @@
             padding: 20px;
         }
         .container {
-            max-width: 1200px;
+            max-width: 1250px;
             margin: 0 auto;
         }
         .header-bar {
@@ -125,6 +125,28 @@
         .btn-submit:hover {
             opacity: 0.9;
         }
+        .btn-action {
+            padding: 6px 10px;
+            font-size: 0.8rem;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            font-weight: bold;
+            text-decoration: none;
+            display: inline-block;
+            margin-right: 4px;
+        }
+        .btn-pay {
+            background-color: #28a745;
+            color: white;
+        }
+        .btn-pay:hover { background-color: #218838; }
+        .btn-edit {
+            background-color: #17a2b8;
+            color: white;
+        }
+        .btn-edit:hover { background-color: #138496; }
+
         table {
             width: 100%;
             border-collapse: collapse;
@@ -257,6 +279,7 @@
         <table>
             <thead>
                 <tr>
+                    <th>N° Factura</th>
                     <th>Fecha</th>
                     <th>Cliente</th>
                     <th>Equipo / Servicio</th>
@@ -264,12 +287,14 @@
                     <th>IVA (19%)</th>
                     <th>Total Bruto</th>
                     <th>Estado</th>
+                    <th>Acciones</th>
                 </tr>
             </thead>
             <tbody>
                 {% if datos %}
                     {% for item in datos %}
                     <tr>
+                        <td><strong>{{ item.n_factura }}</strong></td>
                         <td>{{ item.fecha }}</td>
                         <td>{{ item.cliente }}</td>
                         <td><strong>{{ item.equipo }}</strong>: {{ item.servicio }}</td>
@@ -277,11 +302,22 @@
                         <td>{{ item.iva | clp }}</td>
                         <td><strong>{{ item.total_bruto | clp }}</strong></td>
                         <td>{{ item.estado }}</td>
+                        <td>
+                            {% if str(item.estado).lower() != 'pagado' and str(item.estado).lower() != 'completado' %}
+                                <form action="/marcar_pagado/{{ item.id }}" method="POST" style="display:inline;">
+                                    <button type="submit" class="btn-action btn-pay" title="Marcar como Pagado">💰 Pagar</button>
+                                </form>
+                            {% endif %}
+                            
+                            {% if item.editable %}
+                                <a href="#" class="btn-action btn-edit" title="Disponible por 30 días">✏️ Editar</a>
+                            {% endif %}
+                        </td>
                     </tr>
                     {% endfor %}
                 {% else %}
                     <tr>
-                        <td colspan="7" class="empty-table">No hay trabajos registrados todavía.</td>
+                        <td colspan="9" class="empty-table">No hay trabajos registrados todavía.</td>
                     </tr>
                 {% endif %}
             </tbody>
