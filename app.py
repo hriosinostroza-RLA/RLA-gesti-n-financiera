@@ -26,16 +26,20 @@ def formato_clp(value):
 def index():
     datos = []
     try:
-        # Consulta la tabla de trabajos en Supabase
         response = supabase.table("trabajos").select("*").execute()
         if response.data:
+            for item in response.data:
+                # Aseguramos que ambas claves existan para que el HTML y Supabase no fallen
+                neto_val = item.get('neto') if item.get('neto') is not None else item.get('monto_neto', 0)
+                item['neto'] = neto_val
+                item['monto_neto'] = neto_val
             datos = response.data
     except Exception as e:
         print(f"Error al consultar Supabase: {e}")
 
-    # Cálculos seguros utilizando 'neto' (como está en Supabase)
-    total_ingresos = sum(float(item.get('neto') or 0) for item in datos if str(item.get('estado', '')).lower() in ['pagado', 'completado'])
-    total_pendientes = sum(float(item.get('neto') or 0) for item in datos if str(item.get('estado', '')).lower() not in ['pagado', 'completado'])
+    # Cálculos dinámicos con la clave unificada
+    total_ingresos = sum(float(item.get('monto_neto') or 0) for item in datos if str(item.get('estado', '')).lower() in ['pagado', 'completado'])
+    total_pendientes = sum(float(item.get('monto_neto') or 0) for item in datos if str(item.get('estado', '')).lower() not in ['pagado', 'completado'])
     egresos = sum(float(item.get('gastos_op') or 0) for item in datos)
     capital_disponible = total_ingresos - egresos
 
