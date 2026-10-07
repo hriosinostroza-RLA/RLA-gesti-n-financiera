@@ -33,9 +33,9 @@ def index():
     except Exception as e:
         print(f"Error al consultar Supabase: {e}")
 
-    # Cálculos dinámicos para las tarjetas del panel financiero
-    total_ingresos = sum(float(item.get('monto_neto', 0)) for item in datos if str(item.get('estado', '')).lower() in ['pagado', 'completado'])
-    total_pendientes = sum(float(item.get('monto_neto', 0)) for item in datos if str(item.get('estado', '')).lower() not in ['pagado', 'completado'])
+    # Cálculos dinámicos adaptados a las columnas reales de Supabase
+    total_ingresos = sum(float(item.get('neto', 0)) for item in datos if str(item.get('estado', '')).lower() in ['pagado', 'completado'])
+    total_pendientes = sum(float(item.get('neto', 0)) for item in datos if str(item.get('estado', '')).lower() not in ['pagado', 'completado'])
     egresos = sum(float(item.get('gastos_op', 0)) for item in datos)
     capital_disponible = total_ingresos - egresos
 
@@ -50,18 +50,18 @@ def index():
         capital_disponible=capital_disponible
     )
 
-# Soportamos tanto /agregar_trabajo como /guardar_trabajo para evitar errores 404
+# Soportamos ambas rutas para evitar errores 404
 @app.route('/agregar_trabajo', methods=['POST'])
 @app.route('/guardar_trabajo', methods=['POST'])
 def agregar_trabajo():
     try:
         nuevo_trabajo = {
-            "factura": request.form.get('factura', ''),
+            "n_factura": request.form.get('factura', ''),
             "fecha": request.form.get('fecha', ''),
             "cliente": request.form.get('cliente', ''),
             "equipo": request.form.get('equipo', ''),
             "servicio": request.form.get('servicio', ''),
-            "monto_neto": float(request.form.get('monto_neto', 0) or 0),
+            "neto": float(request.form.get('monto_neto', 0) or 0),
             "gastos_op": float(request.form.get('gastos_op', 0) or 0),
             "viaticos": float(request.form.get('viaticos', 0) or 0),
             "estado": request.form.get('estado', 'Pendiente')
