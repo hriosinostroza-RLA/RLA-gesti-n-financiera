@@ -9,7 +9,7 @@ app = Flask(__name__)
 app.secret_key = 'clave_secreta_para_flash'
 
 # URL de conexión a Supabase (PostgreSQL) usando variables de entorno o fallback directo
-DATABASE_URL = os.environ.get('https://wdwxzftbpqdnesrzpzmq.supabase.co', 'postgresql://postgres:eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Indkd3h6ZnRicHFkbmVzcnpwem1xIiwicm9sZSI6ImFub24iLCJpYXQiOjE3OTEzMjYxNjIsImV4cCI6MjEwNjkwMjE2Mn0.MnkwqiHPYgBi7_pr3xylvRpo8OTrA6pOPh6aPqMLHBQ')
+DATABASE_URL = os.environ.get('DATABASE_URL', 'postgresql://postgres.wdwxzftbpqdnesrzpzmq:AdmiRLApyme@aws-0-us-west-1.pooler.supabase.com:6543/postgres')
 
 @app.template_filter('clp')
 def formato_clp(valor):
