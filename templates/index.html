@@ -96,7 +96,6 @@
             border-radius: 4px;
             font-size: 0.95rem;
         }
-        /* Eliminar flechitas de incremento/decremento en inputs numéricos */
         input[type=number]::-webkit-inner-spin-button, 
         input[type=number]::-webkit-outer-spin-button { 
             -webkit-appearance: none; 
@@ -105,7 +104,6 @@
         input[type=number] {
             -moz-appearance: textfield;
         }
-
         .btn-submit {
             background-color: #ffc107;
             color: #111;
@@ -146,7 +144,6 @@
             color: white;
         }
         .btn-edit:hover { background-color: #138496; }
-
         table {
             width: 100%;
             border-collapse: collapse;
@@ -303,7 +300,7 @@
                         <td><strong>{{ item.total_bruto | clp }}</strong></td>
                         <td>{{ item.estado }}</td>
                         <td>
-                            {% if str(item.estado).lower() != 'pagado' and str(item.estado).lower() != 'completado' %}
+                            {% if item.estado != 'Pagado' and item.estado != 'Completado' %}
                                 <form action="/marcar_pagado/{{ item.id }}" method="POST" style="display:inline;">
                                     <button type="submit" class="btn-action btn-pay" title="Marcar como Pagado">💰 Pagar</button>
                                 </form>
