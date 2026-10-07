@@ -1,5 +1,5 @@
-from flask import Flask, render_template, request, redirect, url_for
 import os
+from flask import Flask, render_template, request, redirect, url_for, jsonify
 from supabase import create_client, Client
 
 app = Flask(__name__)
@@ -8,13 +8,13 @@ app = Flask(__name__)
 SUPABASE_URL = os.environ.get("SUPABASE_URL", "")
 SUPABASE_KEY = os.environ.get("SUPABASE_KEY", "")
 
-# Si pusiste la URL en DATABASE_URL por error, la rescatamos automáticamente por si acaso:
+# Rescate automático por si se configuró en DATABASE_URL por error
 if not SUPABASE_URL and os.environ.get("DATABASE_URL", "").startswith("http"):
     SUPABASE_URL = os.environ.get("DATABASE_URL")
 
 supabase: Client = create_client(SUPABASE_URL, SUPABASE_KEY)
 
-# Filtro personalizado para moneda chilena ($)
+# Filtro personalizado para moneda chilena ($) con formato de puntos
 @app.template_filter('clp')
 def formato_clp(value):
     try:
@@ -25,65 +25,14 @@ def formato_clp(value):
 @app.route('/')
 def index():
     try:
-        res_trabajos = supabase.table("trabajos").select("*").execute()
-        trabajos = res_trabajos.data if res_trabajos.data else []
-
-        res_gastos = supabase.table("gastos_fijos").select("*").execute()
-        gastos_fijos = res_gastos.data if res_gastos.data else []
+        # Ejemplo de consulta a una tabla de Supabase (ajusta el nombre de tu tabla si es necesario)
+        # response = supabase.table("transacciones").select("*").execute()
+        # datos = response.data
+        datos = []
+        return render_template('index.html', datos=datos)
     except Exception as e:
-        print("Error al consultar Supabase:", e)
-        trabajos = []
-        gastos_fijos = []
-
-    # Cálculos financieros
-    total_ingresos = sum(float(t.get('monto_neto', 0)) for t in trabajos if t.get('estado') == 'Pagado')
-    total_pendientes = sum(float(t.get('monto_neto', 0)) for t in trabajos if t.get('estado') == 'Pendiente')
-    
-    total_egresos_trabajos = sum(float(t.get('gastos_op', 0)) + float(t.get('viaticos', 0)) for t in trabajos)
-    total_gastos_fijos = sum(float(g.get('monto', 0)) for g in gastos_fijos)
-    total_egresos = total_egresos_trabajos + total_gastos_fijos
-    
-    capital_disponible = total_ingresos - total_egresos
-
-    return render_template('index.html',
-                           total_ingresos=total_ingresos,
-                           total_pendientes=total_pendientes,
-                           total_egresos=total_egresos,
-                           capital_disponible=capital_disponible,
-                           trabajos=trabajos,
-                           gastos_fijos=gastos_fijos)
-
-@app.route('/guardar_trabajo', methods=['POST'])
-def guardar_trabajo():
-    try:
-        supabase.table("trabajos").insert({
-            "n_factura": request.form.get('n_factura'),
-            "fecha": request.form.get('fecha'),
-            "cliente": request.form.get('cliente'),
-            "equipo": request.form.get('equipo'),
-            "servicio": request.form.get('servicio'),
-            "monto_neto": float(request.form.get('monto_neto', 0)),
-            "gastos_op": float(request.form.get('gastos_op', 0)),
-            "viaticos": float(request.form.get('viaticos', 0)),
-            "estado": request.form.get('estado')
-        }).execute()
-    except Exception as e:
-        print("Error al guardar trabajo:", e)
-
-    return redirect(url_for('index'))
-
-@app.route('/guardar_gasto_fijo', methods=['POST'])
-def guardar_gasto_fijo():
-    try:
-        supabase.table("gastos_fijos").insert({
-            "concepto": request.form.get('concepto'),
-            "monto": float(request.form.get('monto', 0)),
-            "mes": request.form.get('mes')
-        }).execute()
-    except Exception as e:
-        print("Error al guardar gasto fijo:", e)
-
-    return redirect(url_for('index'))
+        return render_template('index.html', datos=[], error=str(e))
 
 if __name__ == '__main__':
-    app.run(debug=True)
+    port = int(os.environ.get("PORT", 5000))
+    app.run(host='0.0.0.0', port=port)
