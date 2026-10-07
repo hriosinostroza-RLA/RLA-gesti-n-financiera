@@ -94,8 +94,18 @@
             padding: 10px;
             border: 1px solid var(--border-color);
             border-radius: 4px;
-            font-size: 0.95srem;
+            font-size: 0.95rem;
         }
+        /* Eliminar flechitas de incremento/decremento en inputs numéricos */
+        input[type=number]::-webkit-inner-spin-button, 
+        input[type=number]::-webkit-outer-spin-button { 
+            -webkit-appearance: none; 
+            margin: 0; 
+        }
+        input[type=number] {
+            -moz-appearance: textfield;
+        }
+
         .btn-submit {
             background-color: #ffc107;
             color: #111;
@@ -149,7 +159,7 @@
     <!-- Panel de Balance (Grid 2x2) -->
     <div class="grid-cards">
         <div class="card green">
-            <div class="card-title">Ingresos (Pagados)</div>
+            <div class="card-title">Ingresos (Pagados con IVA)</div>
             <div class="card-value">{{ total_ingresos | clp }}</div>
         </div>
         <div class="card yellow">
@@ -196,7 +206,7 @@
             </div>
             <div class="form-grid">
                 <div class="form-group">
-                    <label>Monto Netos ($)</label>
+                    <label>Monto Neto ($)</label>
                     <input type="number" step="any" name="monto_neto" placeholder="0" required>
                 </div>
                 <div class="form-group">
@@ -251,6 +261,8 @@
                     <th>Cliente</th>
                     <th>Equipo / Servicio</th>
                     <th>Neto</th>
+                    <th>IVA (19%)</th>
+                    <th>Total Bruto</th>
                     <th>Estado</th>
                 </tr>
             </thead>
@@ -261,13 +273,15 @@
                         <td>{{ item.fecha }}</td>
                         <td>{{ item.cliente }}</td>
                         <td><strong>{{ item.equipo }}</strong>: {{ item.servicio }}</td>
-                        <td>{{ item.monto_neto | clp }}</td>
+                        <td>{{ item.neto | clp }}</td>
+                        <td>{{ item.iva | clp }}</td>
+                        <td><strong>{{ item.total_bruto | clp }}</strong></td>
                         <td>{{ item.estado }}</td>
                     </tr>
                     {% endfor %}
                 {% else %}
                     <tr>
-                        <td colspan="5" class="empty-table">No hay trabajos registrados todavía.</td>
+                        <td colspan="7" class="empty-table">No hay trabajos registrados todavía.</td>
                     </tr>
                 {% endif %}
             </tbody>
