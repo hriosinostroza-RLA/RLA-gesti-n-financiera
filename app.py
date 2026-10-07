@@ -4,7 +4,7 @@ from supabase import create_client, Client
 
 app = Flask(__name__)
 
-# Credenciales de Supabase mediante API HTTP (evita bloqueos de puertos en Render)
+# Credenciales de Supabase mediante API HTTP
 SUPABASE_URL = os.environ.get("SUPABASE_URL", "")
 SUPABASE_KEY = os.environ.get("SUPABASE_KEY", "")
 
@@ -24,14 +24,29 @@ def formato_clp(value):
 
 @app.route('/')
 def index():
+    datos = []
     try:
-        # Ejemplo de consulta a una tabla de Supabase (ajusta el nombre de tu tabla si es necesario)
-        # response = supabase.table("transacciones").select("*").execute()
-        # datos = response.data
-        datos = []
-        return render_template('index.html', datos=datos)
+        # Consulta la tabla de trabajos/servicios en Supabase
+        response = supabase.table("trabajos").select("*").execute()
+        if response.data:
+            datos = response.data
     except Exception as e:
-        return render_template('index.html', datos=[], error=str(e))
+        print(f"Error al consultar Supabase: {e}")
+
+    # Cálculos dinámicos para las tarjetas del panel financiero
+    total_ingresos = sum(float(item.get('monto_neto', 0)) for item in datos if item.get('estado') == 'Pagado')
+    por_cobrar = sum(float(item.get('monto_neto', 0)) for item in datos if item.get('estado') != 'Pagado')
+    egresos = sum(float(item.get('gastos_op', 0)) for item in datos)
+    capital_disponible = total_ingresos - egresos
+
+    return render_template(
+        'index.html',
+        datos=datos,
+        total_ingresos=total_ingresos,
+        por_cobrar=por_cobrar,
+        egresos=egresos,
+        capital_disponible=capital_disponible
+    )
 
 if __name__ == '__main__':
     port = int(os.environ.get("PORT", 5000))
