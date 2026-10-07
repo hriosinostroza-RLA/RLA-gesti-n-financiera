@@ -50,7 +50,9 @@ def index():
         capital_disponible=capital_disponible
     )
 
+# Soportamos tanto /agregar_trabajo como /guardar_trabajo para evitar errores 404
 @app.route('/agregar_trabajo', methods=['POST'])
+@app.route('/guardar_trabajo', methods=['POST'])
 def agregar_trabajo():
     try:
         nuevo_trabajo = {
@@ -71,6 +73,7 @@ def agregar_trabajo():
     return redirect(url_for('index'))
 
 @app.route('/agregar_gasto', methods=['POST'])
+@app.route('/guardar_gasto', methods=['POST'])
 def agregar_gasto():
     try:
         nuevo_gasto = {
@@ -78,7 +81,6 @@ def agregar_gasto():
             "monto": float(request.form.get('monto', 0) or 0),
             "periodo": request.form.get('periodo', '')
         }
-        # Nota: Asegúrate de tener creada la tabla 'gastos_fijos' en Supabase si usas esta ruta
         supabase.table("gastos_fijos").insert(nuevo_gasto).execute()
     except Exception as e:
         print(f"Error al guardar el gasto fijo en Supabase: {e}")
