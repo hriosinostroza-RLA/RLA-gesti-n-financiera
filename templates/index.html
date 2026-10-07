@@ -5,9 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>RLA | Gestión Financiera y Técnica</title>
     <style>
-        * {
-            box-sizing: border-box;
-        }
+        * { box-sizing: border-box; }
         body {
             font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
             background-color: #f4f6f9;
@@ -15,10 +13,7 @@
             padding: 20px;
             color: #333;
         }
-        .dashboard-container {
-            max-width: 1200px;
-            margin: 0 auto;
-        }
+        .dashboard-container { max-width: 1200px; margin: 0 auto; }
         .app-title {
             background: #212529;
             color: #fff;
@@ -48,18 +43,9 @@
         .balance-card.red { border-left-color: #dc3545; }
         .balance-card.blue { border-left-color: #007bff; }
 
-        .balance-card h4 {
-            margin: 0;
-            font-size: 14px;
-            color: #6c757d;
-        }
-        .balance-card .amount {
-            font-size: 26px;
-            font-weight: bold;
-            margin-top: 8px;
-        }
+        .balance-card h4 { margin: 0; font-size: 14px; color: #6c757d; }
+        .balance-card .amount { font-size: 26px; font-weight: bold; margin-top: 8px; }
 
-        /* Contenedores de Tarjetas / Formularios */
         .card-box {
             background: #fff;
             padding: 20px;
@@ -76,28 +62,15 @@
             margin: -20px -20px 20px -20px;
         }
 
-        /* 2. Formularios en Grid de 4x4 (4 Columnas) */
+        /* 2. Formularios en Grid de 4x4 */
         .form-grid-4 {
             display: grid;
             grid-template-columns: repeat(4, 1fr);
             gap: 15px;
         }
-        .form-group {
-            display: flex;
-            flex-direction: column;
-        }
-        .form-group label {
-            font-size: 13px;
-            font-weight: 600;
-            margin-bottom: 5px;
-            color: #495057;
-        }
-        .form-control {
-            padding: 10px;
-            border: 1px solid #ced4da;
-            border-radius: 4px;
-            font-size: 14px;
-        }
+        .form-group { display: flex; flex-direction: column; }
+        .form-group label { font-size: 13px; font-weight: 600; margin-bottom: 5px; color: #495057; }
+        .form-control { padding: 10px; border: 1px solid #ced4da; border-radius: 4px; font-size: 14px; }
         .form-group.span-2 { grid-column: span 2; }
         .form-group.span-4 { grid-column: span 4; }
 
@@ -113,47 +86,23 @@
             transition: background 0.2s;
         }
         .btn-primary:hover { background: #e0a800; }
-        
-        .btn-danger {
-            background: #dc3545;
-            color: #fff;
-        }
+        .btn-danger { background: #dc3545; color: #fff; }
         .btn-danger:hover { background: #c82333; }
 
-        /* Tabla de Historial */
-        .table-responsive {
-            overflow-x: auto;
-        }
-        table {
-            width: 100%;
-            border-collapse: collapse;
-            margin-top: 10px;
-        }
-        th, td {
-            padding: 12px;
-            text-align: left;
-            border-bottom: 1px solid #dee2e6;
-            font-size: 14px;
-        }
-        th {
-            background-color: #343a40;
-            color: white;
-        }
+        .table-responsive { overflow-x: auto; }
+        table { width: 100%; border-collapse: collapse; margin-top: 10px; }
+        th, td { padding: 12px; text-align: left; border-bottom: 1px solid #dee2e6; font-size: 14px; }
+        th { background-color: #343a40; color: white; }
 
         @media (max-width: 900px) {
-            .balances-grid, .form-grid-4 {
-                grid-template-columns: 1fr;
-            }
-            .form-group.span-2, .form-group.span-4 {
-                grid-column: span 1;
-            }
+            .balances-grid, .form-grid-4 { grid-template-columns: 1fr; }
+            .form-group.span-2, .form-group.span-4 { grid-column: span 1; }
         }
     </style>
 </head>
 <body>
 
 <div class="dashboard-container">
-  
     <div class="app-title">⚙️ RLA | Gestión Financiera y Técnica</div>
 
     <!-- 1. CUADROS DE BALANCES (2x2) -->
@@ -200,7 +149,7 @@
                 </div>
                 <div class="form-group span-2">
                     <label>Servicio Realizado</label>
-                    <input type="text" name="servicio" class="form-control" placeholder="Mantención preventiva / cambio rodamientos" required>
+                    <input type="text" name="servicio" class="form-control" placeholder="Mantención preventiva / rodamientos" required>
                 </div>
 
                 <div class="form-group">
@@ -289,7 +238,6 @@
             </table>
         </div>
     </div>
-
 </div>
 
 </body>
