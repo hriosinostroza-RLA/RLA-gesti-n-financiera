@@ -44,8 +44,9 @@ def index():
         datos=datos,
         total_ingresos=total_ingresos,
         total_pendientes=total_pendientes,
-        por_cobrar=total_pendientes,  # Alias por si tu HTML usa por_cobrar
+        por_cobrar=total_pendientes,
         egresos=egresos,
+        total_egresos=egresos,  # Alias exacto para evitar el error actual
         capital_disponible=capital_disponible
     )
 
