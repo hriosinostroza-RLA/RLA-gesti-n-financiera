@@ -1,15 +1,56 @@
 from flask import Flask, render_template, request, redirect, url_for
 import os
-from supabase import create_client, Client
+import psycopg2
+import psycopg2.extras
 
 app = Flask(__name__)
+app.secret_key = 'clave_secreta_para_flash'
 
-# Configuración de Supabase desde las variables de entorno de Render
-SUPABASE_URL = os.environ.get("SUPABASE_URL")
-SUPABASE_KEY = os.environ.get("SUPABASE_KEY")
-supabase: Client = create_client(SUPABASE_URL, SUPABASE_KEY)
+def get_db_connection():
+    db_url = os.environ.get("DATABASE_URL", "")
+    # Render bloquea el puerto 5432 en cuentas gratuitas; cambiamos al puerto 6543 (pooler)
+    if ":5432" in db_url:
+        db_url = db_url.replace(":5432", ":6543")
+    
+    conn = psycopg2.connect(db_url, sslmode='require')
+    return conn
 
-# Filtro personalizado para moneda chilena ($)
+# Crear tablas automáticamente si no existen
+def init_db():
+    try:
+        conn = get_db_connection()
+        cur = conn.cursor()
+        cur.execute('''
+            CREATE TABLE IF NOT EXISTS trabajos (
+                id SERIAL PRIMARY KEY,
+                n_factura VARCHAR(50),
+                fecha VARCHAR(50),
+                cliente VARCHAR(150),
+                equipo VARCHAR(150),
+                servicio TEXT,
+                monto_neto NUMERIC,
+                gastos_op NUMERIC DEFAULT 0,
+                viaticos NUMERIC DEFAULT 0,
+                estado VARCHAR(50)
+            )
+        ''')
+        cur.execute('''
+            CREATE TABLE IF NOT EXISTS gastos_fijos (
+                id SERIAL PRIMARY KEY,
+                concepto VARCHAR(150),
+                monto NUMERIC,
+                mes VARCHAR(50)
+            )
+        ''')
+        conn.commit()
+        cur.close()
+        conn.close()
+    except Exception as e:
+        print("Error inicializando la base de datos:", e)
+
+init_db()
+
+# Filtro para moneda chilena
 @app.template_filter('clp')
 def formato_clp(value):
     try:
@@ -19,22 +60,28 @@ def formato_clp(value):
 
 @app.route('/')
 def index():
+    trabajos = []
+    gastos_fijos = []
     try:
-        response_trabajos = supabase.table("trabajos").select("*").execute()
-        trabajos = response_trabajos.data if response_trabajos.data else []
-
-        response_gastos = supabase.table("gastos_fijos").select("*").execute()
-        gastos_fijos = response_gastos.data if response_gastos.data else []
+        conn = get_db_connection()
+        cur = conn.cursor(cursor_factory=psycopg2.extras.DictCursor)
+        
+        cur.execute("SELECT * FROM trabajos ORDER BY id DESC")
+        trabajos = cur.fetchall()
+        
+        cur.execute("SELECT * FROM gastos_fijos ORDER BY id DESC")
+        gastos_fijos = cur.fetchall()
+        
+        cur.close()
+        conn.close()
     except Exception as e:
-        print("Error al conectar con Supabase:", e)
-        trabajos = []
-        gastos_fijos = []
+        print("Error al consultar la base de datos:", e)
 
-    total_ingresos = sum(float(t.get('monto_neto', 0)) for t in trabajos if t.get('estado') == 'Pagado')
-    total_pendientes = sum(float(t.get('monto_neto', 0)) for t in trabajos if t.get('estado') == 'Pendiente')
+    total_ingresos = sum(float(t['monto_neto'] or 0) for t in trabajos if t['estado'] == 'Pagado')
+    total_pendientes = sum(float(t['monto_neto'] or 0) for t in trabajos if t['estado'] == 'Pendiente')
     
-    total_egresos_trabajos = sum(float(t.get('gastos_op', 0)) + float(t.get('viaticos', 0)) for t in trabajos)
-    total_gastos_fijos = sum(float(g.get('monto', 0)) for g in gastos_fijos)
+    total_egresos_trabajos = sum(float(t['gastos_op'] or 0) + float(t['viaticos'] or 0) for t in trabajos)
+    total_gastos_fijos = sum(float(g['monto'] or 0) for g in gastos_fijos)
     total_egresos = total_egresos_trabajos + total_gastos_fijos
     
     capital_disponible = total_ingresos - total_egresos
@@ -60,17 +107,15 @@ def guardar_trabajo():
     estado = request.form.get('estado')
 
     try:
-        supabase.table("trabajos").insert({
-            "n_factura": n_factura,
-            "fecha": fecha,
-            "cliente": cliente,
-            "equipo": equipo,
-            "servicio": servicio,
-            "monto_neto": monto_neto,
-            "gastos_op": gastos_op,
-            "viaticos": viaticos,
-            "estado": estado
-        }).execute()
+        conn = get_db_connection()
+        cur = conn.cursor()
+        cur.execute(
+            "INSERT INTO trabajos (n_factura, fecha, cliente, equipo, servicio, monto_neto, gastos_op, viaticos, estado) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s)",
+            (n_factura, fecha, cliente, equipo, servicio, monto_neto, gastos_op, viaticos, estado)
+        )
+        conn.commit()
+        cur.close()
+        conn.close()
     except Exception as e:
         print("Error al guardar trabajo:", e)
 
@@ -83,11 +128,15 @@ def guardar_gasto_fijo():
     mes = request.form.get('mes')
 
     try:
-        supabase.table("gastos_fijos").insert({
-            "concepto": concepto,
-            "monto": monto,
-            "mes": mes
-        }).execute()
+        conn = get_db_connection()
+        cur = conn.cursor()
+        cur.execute(
+            "INSERT INTO gastos_fijos (concepto, monto, mes) VALUES (%s, %s, %s)",
+            (concepto, monto, mes)
+        )
+        conn.commit()
+        cur.close()
+        conn.close()
     except Exception as e:
         print("Error al guardar gasto fijo:", e)
 
