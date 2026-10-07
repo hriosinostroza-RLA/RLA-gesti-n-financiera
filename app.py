@@ -1,5 +1,5 @@
 import os
-from flask import Flask, render_template, request, redirect, url_for, jsonify
+from flask import Flask, render_template, request, redirect, url_for
 from supabase import create_client, Client
 
 app = Flask(__name__)
@@ -26,7 +26,7 @@ def formato_clp(value):
 def index():
     datos = []
     try:
-        # Consulta la tabla de trabajos/servicios en Supabase
+        # Consulta la tabla de trabajos en Supabase
         response = supabase.table("trabajos").select("*").execute()
         if response.data:
             datos = response.data
@@ -46,9 +46,44 @@ def index():
         total_pendientes=total_pendientes,
         por_cobrar=total_pendientes,
         egresos=egresos,
-        total_egresos=egresos,  # Alias exacto para evitar el error actual
+        total_egresos=egresos,
         capital_disponible=capital_disponible
     )
+
+@app.route('/agregar_trabajo', methods=['POST'])
+def agregar_trabajo():
+    try:
+        nuevo_trabajo = {
+            "factura": request.form.get('factura', ''),
+            "fecha": request.form.get('fecha', ''),
+            "cliente": request.form.get('cliente', ''),
+            "equipo": request.form.get('equipo', ''),
+            "servicio": request.form.get('servicio', ''),
+            "monto_neto": float(request.form.get('monto_neto', 0) or 0),
+            "gastos_op": float(request.form.get('gastos_op', 0) or 0),
+            "viaticos": float(request.form.get('viaticos', 0) or 0),
+            "estado": request.form.get('estado', 'Pendiente')
+        }
+        supabase.table("trabajos").insert(nuevo_trabajo).execute()
+    except Exception as e:
+        print(f"Error al guardar el trabajo en Supabase: {e}")
+    
+    return redirect(url_for('index'))
+
+@app.route('/agregar_gasto', methods=['POST'])
+def agregar_gasto():
+    try:
+        nuevo_gasto = {
+            "concepto": request.form.get('concepto', ''),
+            "monto": float(request.form.get('monto', 0) or 0),
+            "periodo": request.form.get('periodo', '')
+        }
+        # Nota: Asegúrate de tener creada la tabla 'gastos_fijos' en Supabase si usas esta ruta
+        supabase.table("gastos_fijos").insert(nuevo_gasto).execute()
+    except Exception as e:
+        print(f"Error al guardar el gasto fijo en Supabase: {e}")
+    
+    return redirect(url_for('index'))
 
 if __name__ == '__main__':
     port = int(os.environ.get("PORT", 5000))
