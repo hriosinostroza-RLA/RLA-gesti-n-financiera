@@ -4,9 +4,9 @@ from supabase import create_client, Client
 
 app = Flask(__name__)
 
-# Configuración de Supabase (ajusta con tus variables de entorno o credenciales)
-SUPABASE_URL = os.environ.get("SUPABASE_URL", "TU_SUPABASE_URL")
-SUPABASE_KEY = os.environ.get("SUPABASE_KEY", "TU_SUPABASE_KEY")
+# Configuración de Supabase desde las variables de entorno de Render
+SUPABASE_URL = os.environ.get("SUPABASE_URL")
+SUPABASE_KEY = os.environ.get("SUPABASE_KEY")
 supabase: Client = create_client(SUPABASE_URL, SUPABASE_KEY)
 
 # Filtro personalizado para moneda chilena ($)
@@ -20,11 +20,9 @@ def formato_clp(value):
 @app.route('/')
 def index():
     try:
-        # Obtener trabajos desde Supabase
         response_trabajos = supabase.table("trabajos").select("*").execute()
         trabajos = response_trabajos.data if response_trabajos.data else []
 
-        # Obtener gastos fijos desde Supabase
         response_gastos = supabase.table("gastos_fijos").select("*").execute()
         gastos_fijos = response_gastos.data if response_gastos.data else []
     except Exception as e:
@@ -32,7 +30,6 @@ def index():
         trabajos = []
         gastos_fijos = []
 
-    # Cálculos financieros
     total_ingresos = sum(float(t.get('monto_neto', 0)) for t in trabajos if t.get('estado') == 'Pagado')
     total_pendientes = sum(float(t.get('monto_neto', 0)) for t in trabajos if t.get('estado') == 'Pendiente')
     
