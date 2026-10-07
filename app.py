@@ -33,10 +33,10 @@ def index():
     except Exception as e:
         print(f"Error al consultar Supabase: {e}")
 
-    # Cálculos dinámicos adaptados a las columnas reales de Supabase
-    total_ingresos = sum(float(item.get('neto', 0)) for item in datos if str(item.get('estado', '')).lower() in ['pagado', 'completado'])
-    total_pendientes = sum(float(item.get('neto', 0)) for item in datos if str(item.get('estado', '')).lower() not in ['pagado', 'completado'])
-    egresos = sum(float(item.get('gastos_op', 0)) for item in datos)
+    # Cálculos seguros utilizando 'neto' (como está en Supabase)
+    total_ingresos = sum(float(item.get('neto') or 0) for item in datos if str(item.get('estado', '')).lower() in ['pagado', 'completado'])
+    total_pendientes = sum(float(item.get('neto') or 0) for item in datos if str(item.get('estado', '')).lower() not in ['pagado', 'completado'])
+    egresos = sum(float(item.get('gastos_op') or 0) for item in datos)
     capital_disponible = total_ingresos - egresos
 
     return render_template(
@@ -50,7 +50,6 @@ def index():
         capital_disponible=capital_disponible
     )
 
-# Soportamos ambas rutas para evitar errores 404
 @app.route('/agregar_trabajo', methods=['POST'])
 @app.route('/guardar_trabajo', methods=['POST'])
 def agregar_trabajo():
@@ -61,9 +60,9 @@ def agregar_trabajo():
             "cliente": request.form.get('cliente', ''),
             "equipo": request.form.get('equipo', ''),
             "servicio": request.form.get('servicio', ''),
-            "neto": float(request.form.get('monto_neto', 0) or 0),
-            "gastos_op": float(request.form.get('gastos_op', 0) or 0),
-            "viaticos": float(request.form.get('viaticos', 0) or 0),
+            "neto": float(request.form.get('monto_neto') or 0),
+            "gastos_op": float(request.form.get('gastos_op') or 0),
+            "viaticos": float(request.form.get('viaticos') or 0),
             "estado": request.form.get('estado', 'Pendiente')
         }
         supabase.table("trabajos").insert(nuevo_trabajo).execute()
@@ -78,7 +77,7 @@ def agregar_gasto():
     try:
         nuevo_gasto = {
             "concepto": request.form.get('concepto', ''),
-            "monto": float(request.form.get('monto', 0) or 0),
+            "monto": float(request.form.get('monto') or 0),
             "periodo": request.form.get('periodo', '')
         }
         supabase.table("gastos_fijos").insert(nuevo_gasto).execute()
