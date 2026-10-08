@@ -1,14 +1,10 @@
 import os
 import io
+import urllib.request
+import json
 from datetime import datetime, date
 from flask import Flask, render_template, request, redirect, url_for, send_file
 from supabase import create_client, Client
-
-# Configurar matplotlib en modo headless para servidores sin interfaz gráfica
-import matplotlib
-matplotlib.use('Agg')
-import matplotlib.pyplot as plt
-
 from reportlab.lib.pagesizes import letter
 from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer, Table, TableStyle, Image
 from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
@@ -36,7 +32,6 @@ def index():
     datos_trabajos = []
     datos_gastos = []
 
-    # 1. Obtener Trabajos desde Supabase
     try:
         resp_trabajos = supabase.table("trabajos").select("*").execute()
         if resp_trabajos.data:
@@ -51,7 +46,6 @@ def index():
     except Exception as e:
         print(f"Error al consultar trabajos en Supabase: {e}")
 
-    # 2. Obtener Gastos Fijos desde Supabase
     try:
         resp_gastos = supabase.table("gastos_fijos").select("*").execute()
         if resp_gastos.data:
@@ -100,7 +94,6 @@ def exportar_pdf():
     elements.append(Paragraph(f"Reporte generado el: {date.today().strftime('%d-%m-%Y')}", normal_style))
     elements.append(Spacer(1, 8))
 
-    # Obtener datos de Supabase
     try:
         resp_trabajos = supabase.table("trabajos").select("*").execute()
         datos_trabajos = resp_trabajos.data if resp_trabajos.data else []
@@ -120,7 +113,7 @@ def exportar_pdf():
     egresos = total_gastos_op + total_gastos_fijos
     capital_disponible = total_ingresos - egresos
 
-    # 1. Tabla de Balance General (4 indicadores)
+    # 1. Tabla de Balance General
     elements.append(Paragraph("<b>Resumen de Balance General</b>", subtitle_style))
     balance_data = [
         ["Ingresos (Pagados con IVA)", "Por Cobrar (Pendientes)", "Egresos Op. & Fijos", "Capital Disponible"],
@@ -145,7 +138,7 @@ def exportar_pdf():
     elements.append(balance_table)
     elements.append(Spacer(1, 10))
 
-    # 2. Generar Gráfico con Matplotlib e insertarlo en el PDF
+    # 2. Obtener Gráfico desde QuickChart (mismos datos y colores que tu web)
     meses_nombres = ["Ene", "Feb", "Mar", "Abr", "May", "Jun", "Jul", "Ago", "Sep", "Oct", "Nov", "Dic"]
     ingresos_mensuales = [0] * 12
     egresos_mensuales = [0] * 12
@@ -188,27 +181,28 @@ def exportar_pdf():
         if m_idx is not None:
             egresos_mensuales[m_idx] += float(gasto.get('monto', 0))
 
-    fig, ax = plt.subplots(figsize=(7, 2.5))
-    x = range(12)
-    width = 0.35
-    ax.bar([i - width/2 for i in x], ingresos_mensuales, width, label='Ingresos (Pagados)', color='#28a745')
-    ax.bar([i + width/2 for i in x], egresos_mensuales, width, label='Egresos (Op. & Fijos)', color='#dc3545')
-    ax.set_xticks(list(x))
-    ax.set_xticklabels(meses_nombres, fontsize=8)
-    ax.legend(fontsize=7, loc='upper right')
-    ax.set_title("Resumen Financiero Mensual (2026)", fontsize=9, fontweight='bold')
-    ax.spines['top'].set_visible(False)
-    ax.spines['right'].set_visible(False)
-    plt.tight_layout()
+    chart_config = {
+        "type": "bar",
+        "data": {
+            "labels": meses_nombres,
+            "datasets": [
+                {"label": "Ingresos (Pagados)", "data": ingresos_mensuales, "backgroundColor": "#28a745"},
+                {"label": "Egresos (Op. & Fijos)", "data": egresos_mensuales, "backgroundColor": "#dc3545"}
+            ]
+        },
+        "options": {
+            "title": {"display": True, "text": "Resumen Financiero Mensual (2026)"}
+        }
+    }
 
-    chart_buffer = io.BytesIO()
-    plt.savefig(chart_buffer, format='png', dpi=150)
-    plt.close()
-    chart_buffer.seek(0)
-
-    elements.append(Paragraph("<b>Gráfico Resumen Financiero Mensual</b>", subtitle_style))
-    elements.append(Image(chart_buffer, width=500, height=180))
-    elements.append(Spacer(1, 10))
+    try:
+        chart_url = f"https://quickchart.io/chart?w=500&h=180&c={urllib.parse.quote(json.dumps(chart_config))}"
+        chart_img_data = urllib.request.urlopen(chart_url).read()
+        elements.append(Paragraph("<b>Gráfico Resumen Financiero Mensual</b>", subtitle_style))
+        elements.append(Image(io.BytesIO(chart_img_data), width=500, height=180))
+        elements.append(Spacer(1, 10))
+    except Exception as e:
+        print(f"No se pudo cargar el gráfico remoto: {e}")
 
     # 3. Tabla Trabajos PDF
     elements.append(Paragraph("<b>Historial de Trabajos y Servicios</b>", subtitle_style))
