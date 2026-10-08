@@ -29,7 +29,6 @@ def formato_clp(value):
 def index():
     datos_trabajos = []
     datos_gastos = []
-    hoy = date.today()
 
     # 1. Obtener Trabajos
     try:
@@ -41,10 +40,7 @@ def index():
                 item['monto_neto'] = neto_val
                 item['iva'] = neto_val * 0.19
                 item['total_bruto'] = neto_val * 1.19
-                
-                # Deshabilitamos la restricción de 10 días para que el botón de editar SIEMPRE aparezca activo
                 item['editable'] = True
-
             datos_trabajos = resp_trabajos.data
     except Exception as e:
         print(f"Error al consultar trabajos en Supabase: {e}")
@@ -57,10 +53,7 @@ def index():
                 mes_val = item.get('mes') if item.get('mes') is not None else item.get('periodo', '')
                 item['mes'] = mes_val
                 item['periodo'] = mes_val
-                
-                # Deshabilitamos la restricción de 10 días para que el botón de editar SIEMPRE aparezca activo
                 item['editable'] = True
-
             datos_gastos = resp_gastos.data
     except Exception as e:
         print(f"Error al consultar gastos fijos en Supabase: {e}")
@@ -93,21 +86,8 @@ def exportar_pdf():
     elements = []
     
     styles = getSampleStyleSheet()
-    title_style = ParagraphStyle(
-        'TitleStyle',
-        parent=styles['Heading1'],
-        fontSize=16,
-        textColor=colors.HexColor('#22252a'),
-        spaceAfter=12
-    )
-    subtitle_style = ParagraphStyle(
-        'SubTitleStyle',
-        parent=styles['Heading2'],
-        fontSize=12,
-        textColor=colors.HexColor('#444444'),
-        spaceAfter=6,
-        spaceBefore=12
-    )
+    title_style = ParagraphStyle('TitleStyle', parent=styles['Heading1'], fontSize=16, textColor=colors.HexColor('#22252a'), spaceAfter=12)
+    subtitle_style = ParagraphStyle('SubTitleStyle', parent=styles['Heading2'], fontSize=12, textColor=colors.HexColor('#444444'), spaceAfter=6, spaceBefore=12)
     normal_style = styles['Normal']
 
     elements.append(Paragraph("<b>RLA | Gestión Financiera y Técnica</b>", title_style))
@@ -255,4 +235,31 @@ def agregar_gasto():
     
     return redirect(url_for('index'))
 
-@app.route('/editar_gasto/<int:id>', methods
+@app.route('/editar_gasto/<int:id>', methods=['GET', 'POST'])
+def editar_gasto(id):
+    if request.method == 'POST':
+        try:
+            datos_actualizados = {
+                "concepto": request.form.get('concepto', ''),
+                "monto": float(request.form.get('monto') or 0),
+                "mes": request.form.get('periodo', '')
+            }
+            supabase.table("gastos_fijos").update(datos_actualizados).eq("id", id).execute()
+        except Exception as e:
+            print(f"Error al actualizar gasto fijo: {e}")
+        return redirect(url_for('index'))
+    
+    try:
+        resp = supabase.table("gastos_fijos").select("*").eq("id", id).execute()
+        gasto = resp.data[0] if resp.data else None
+        if gasto:
+            gasto['periodo'] = gasto.get('mes') or gasto.get('periodo', '')
+    except Exception as e:
+        print(f"Error al obtener gasto fijo para editar: {e}")
+        gasto = None
+
+    return render_template('editar_gasto.html', gasto=gasto)
+
+if __name__ == '__main__':
+    port = int(os.environ.get("PORT", 5000))
+    app.run(host='0.0.0.0', port=port)
