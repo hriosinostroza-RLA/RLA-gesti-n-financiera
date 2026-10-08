@@ -216,9 +216,9 @@
         </div>
     </div>
 
-    <!-- Gráficos de 12 Meses Corridos -->
+    <!-- Gráficos de 12 Meses (Enero a Diciembre 2026) -->
     <div class="section-box">
-        <div class="section-title">📊 Resumen Financiero Mensual (Últimos 12 Meses)</div>
+        <div class="section-title">📊 Resumen Financiero Mensual (Enero - Diciembre 2026)</div>
         <div class="chart-container">
             <canvas id="financialChart"></canvas>
         </div>
@@ -388,7 +388,7 @@
 </div>
 
 <script>
-    // Procesar datos para los últimos 12 meses en el gráfico
+    // Procesar datos de trabajos y gastos fijos
     const trabajos = [
         {% for item in datos %}
             {
@@ -408,27 +408,24 @@
         {% endfor %}
     ];
 
-    // Generar etiquetas de los últimos 12 meses
+    // Definir los 12 meses fijos del año 2026 (Enero a Diciembre)
     const mesesNombres = ["Ene", "Feb", "Mar", "Abr", "May", "Jun", "Jul", "Ago", "Sep", "Oct", "Nov", "Dic"];
-    const hoy = new Date();
     let labels = [];
     let ingresosMap = {};
     let egresosMap = {};
 
-    for (let i = 11; i >= 0; i--) {
-        let d = new Date(hoy.getFullYear(), hoy.getMonth() - i, 1);
-        let anio = d.getFullYear();
-        let mesIdx = d.getMonth();
-        let key = `${anio}-${String(mesIdx + 1).padStart(2, '0')}`;
-        let label = `${mesesNombres[mesIdx]} ${anio}`;
+    for (let m = 0; m < 12; m++) {
+        let anio = 2026;
+        let key = `${anio}-${String(m + 1).padStart(2, '0')}`;
+        let label = `${mesesNombres[m]} ${anio}`;
         labels.push(label);
         ingresosMap[key] = 0;
         egresosMap[key] = 0;
     }
 
-    // Agrupar ingresos de trabajos por mes
+    // Agrupar ingresos y gastos operativos de los trabajos por mes (año 2026)
     trabajos.forEach(t => {
-        if (t.fecha) {
+        if (t.fecha && t.fecha.startsWith("2026")) {
             let key = t.fecha.substring(0, 7); // YYYY-MM
             if (ingresosMap[key] !== undefined) {
                 ingresosMap[key] += t.ingreso;
@@ -437,12 +434,33 @@
         }
     });
 
-    // Agrupar gastos fijos (intentando matchear por texto o asignando al mes actual si no coincide exacto)
+    // Mapeo inteligente para los gastos fijos según el texto del mes registrado
+    const mapMesTexto = {
+        "enero": "2026-01", "january": "2026-01",
+        "febrero": "2026-02", "february": "2026-02",
+        "marzo": "2026-03", "march": "2026-03",
+        "abril": "2026-04", "april": "2026-04",
+        "mayo": "2026-05", "may": "2026-05",
+        "junio": "2026-06", "june": "2026-06",
+        "julio": "2026-07", "july": "2026-07",
+        "agosto": "2026-08", "august": "2026-08",
+        "septiembre": "2026-09", "september": "2026-09",
+        "octubre": "2026-10", "october": "2026-10",
+        "noviembre": "2026-11", "november": "2026-11",
+        "diciembre": "2026-12", "december": "2026-12"
+    };
+
     gastosFijos.forEach(g => {
-        // Tomamos el primer mes del arreglo de 12 meses para centralizar si es un gasto general, o buscamos coincidencia
-        let keys = Object.keys(egresosMap);
-        if (keys.length > 0) {
-            egresosMap[keys[keys.length - 1]] += g.monto;
+        let textoMes = (g.mes || "").toLowerCase();
+        let encontradoKey = null;
+        for (let [nombre, keyVal] of Object.entries(mapMesTexto)) {
+            if (textoMes.includes(nombre)) {
+                encontradoKey = keyVal;
+                break;
+            }
+        }
+        if (encontradoKey && egresosMap[encontradoKey] !== undefined) {
+            egresosMap[encontradoKey] += g.monto;
         }
     });
 
