@@ -120,7 +120,7 @@ def agregar_gasto():
         nuevo_gasto = {
             "concepto": request.form.get('concepto', ''),
             "monto": float(request.form.get('monto') or 0),
-            "periodo": request.form.get('periodo', '')
+            "mes": request.form.get('periodo', '')
         }
         supabase.table("gastos_fijos").insert(nuevo_gasto).execute()
     except Exception as e:
