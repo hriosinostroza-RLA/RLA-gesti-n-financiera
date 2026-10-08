@@ -1,0 +1,39 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <title>Editar Gasto Fijo | RLA</title>
+    <style>
+        body { font-family: Arial, sans-serif; background-color: #f4f6f9; padding: 30px; }
+        .container { max-width: 500px; margin: 0 auto; background: #fff; padding: 25px; border-radius: 8px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); }
+        h2 { background: #22252a; color: white; padding: 12px 15px; margin: -25px -25px 20px -25px; border-radius: 6px 6px 0 0; }
+        .form-group { display: flex; flex-direction: column; margin-bottom: 15px; }
+        .form-group label { font-size: 0.85rem; font-weight: bold; margin-bottom: 5px; color: #444; }
+        .form-group input { padding: 10px; border: 1px solid #dcdcdc; border-radius: 4px; font-size: 0.95rem; }
+        .btn-submit { background-color: #17a2b8; color: white; border: none; padding: 12px; font-weight: bold; border-radius: 4px; cursor: pointer; width: 100%; margin-top: 10px; }
+        .btn-submit:hover { opacity: 0.9; }
+        .btn-back { display: block; text-align: center; margin-top: 15px; color: #666; text-decoration: none; font-size: 0.9rem; }
+    </style>
+</head>
+<body>
+<div class="container">
+    <h2>✏️ Editar Gasto Fijo</h2>
+    <form method="POST">
+        <div class="form-group">
+            <label>Concepto del Gasto Fijo</label>
+            <input type="text" name="concepto" value="{{ gasto.concepto }}" required>
+        </div>
+        <div class="form-group">
+            <label>Monto ($)</label>
+            <input type="number" step="any" name="monto" value="{{ gasto.monto }}" required>
+        </div>
+        <div class="form-group">
+            <label>Mes / Periodo</label>
+            <input type="text" name="periodo" value="{{ gasto.periodo }}" required>
+        </div>
+        <button type="submit" class="btn-submit">💾 Guardar Cambios</button>
+    </form>
+    <a href="/" class="btn-back">← Volver al inicio</a>
+</div>
+</body>
+</html>
