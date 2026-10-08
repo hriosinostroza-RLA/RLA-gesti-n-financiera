@@ -227,8 +227,7 @@ def agregar_gasto():
         nuevo_gasto = {
             "concepto": request.form.get('concepto', ''),
             "monto": float(request.form.get('monto') or 0),
-            "mes": periodo_val,
-            "created_at": datetime.now().isoformat()
+            "mes": periodo_val
         }
         print(f"Insertando gasto fijo en Supabase: {nuevo_gasto}")
         supabase.table("gastos_fijos").insert(nuevo_gasto).execute()
