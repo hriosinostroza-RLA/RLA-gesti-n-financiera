@@ -1,7 +1,12 @@
 import os
+import io
 from datetime import datetime, date
-from flask import Flask, render_template, request, redirect, url_for
+from flask import Flask, render_template, request, redirect, url_for, send_file
 from supabase import create_client, Client
+from reportlab.lib.pagesizes import letter
+from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer, Table, TableStyle
+from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
+from reportlab.lib import colors
 
 app = Flask(__name__)
 
@@ -42,13 +47,12 @@ def index():
                 if fecha_ref:
                     try:
                         f_reg = datetime.strptime(fecha_ref.split('T')[0], '%Y-%m-%d').date()
-                        dias_transcurridos = (hoy - f_reg).days
-                        if 0 <= dias_transcurridos <= 10:
+                        if (hoy - f_reg).days <= 10:
                             editable = True
                     except Exception:
                         pass
                 else:
-                    editable = True  # Respaldo para registros antiguos sin created_at
+                    editable = True
                 item['editable'] = editable
 
             datos_trabajos = resp_trabajos.data
@@ -69,8 +73,7 @@ def index():
                 if fecha_ref:
                     try:
                         f_reg = datetime.strptime(fecha_ref.split('T')[0], '%Y-%m-%d').date()
-                        dias_transcurridos = (hoy - f_reg).days
-                        if 0 <= dias_transcurridos <= 10:
+                        if (hoy - f_reg).days <= 10:
                             editable = True
                     except Exception:
                         pass
@@ -102,6 +105,98 @@ def index():
         total_egresos=egresos,
         capital_disponible=capital_disponible
     )
+
+@app.route('/exportar_pdf')
+def exportar_pdf():
+    buffer = io.BytesIO()
+    doc = SimpleDocTemplate(buffer, pagesize=letter, rightMargin=30, leftMargin=30, topMargin=30, bottomMargin=30)
+    elements = []
+    
+    styles = getSampleStyleSheet()
+    title_style = ParagraphStyle(
+        'TitleStyle',
+        parent=styles['Heading1'],
+        fontSize=16,
+        textColor=colors.HexColor('#22252a'),
+        spaceAfter=12
+    )
+    subtitle_style = ParagraphStyle(
+        'SubTitleStyle',
+        parent=styles['Heading2'],
+        fontSize=12,
+        textColor=colors.HexColor('#444444'),
+        spaceAfter=6,
+        spaceBefore=12
+    )
+    normal_style = styles['Normal']
+
+    elements.append(Paragraph("<b>RLA | Gestión Financiera y Técnica</b>", title_style))
+    elements.append(Paragraph(f"Reporte generado el: {date.today().strftime('%d-%m-%Y')}", normal_style))
+    elements.append(Spacer(1, 15))
+
+    # Obtener datos de Supabase para el PDF
+    try:
+        resp_trabajos = supabase.table("trabajos").select("*").execute()
+        datos_trabajos = resp_trabajos.data if resp_trabajos.data else []
+    except Exception:
+        datos_trabajos = []
+
+    try:
+        resp_gastos = supabase.table("gastos_fijos").select("*").execute()
+        datos_gastos = resp_gastos.data if resp_gastos.data else []
+    except Exception:
+        datos_gastos = []
+
+    # Tabla Trabajos
+    elements.append(Paragraph("<b>Historial de Trabajos y Servicios</b>", subtitle_style))
+    t_data = [["Factura", "Fecha", "Cliente", "Equipo", "Neto", "Estado"]]
+    for item in datos_trabajos:
+        neto_val = item.get('neto') or item.get('monto_neto', 0)
+        t_data.append([
+            str(item.get('n_factura', '')),
+            str(item.get('fecha', '')),
+            str(item.get('cliente', '')),
+            str(item.get('equipo', '')),
+            f"${int(neto_val):,}".replace(",", "."),
+            str(item.get('estado', ''))
+        ])
+    
+    t_table = Table(t_data, colWidths=[55, 65, 100, 110, 80, 80])
+    t_table.setStyle(TableStyle([
+        ('BACKGROUND', (0, 0), (-1, 0), colors.HexColor('#22252a')),
+        ('TEXTCOLOR', (0, 0), (-1, 0), colors.white),
+        ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),
+        ('FONTSIZE', (0, 0), (-1, -1), 8),
+        ('BOTTOMPADDING', (0, 0), (-1, -1), 5),
+        ('GRID', (0, 0), (-1, -1), 0.5, colors.HexColor('#dcdcdc'))
+    ]))
+    elements.append(t_table)
+    elements.append(Spacer(1, 15))
+
+    # Tabla Gastos Fijos
+    elements.append(Paragraph("<b>Historial de Gastos Fijos</b>", subtitle_style))
+    g_data = [["Concepto", "Periodo / Mes", "Monto"]]
+    for gasto in datos_gastos:
+        g_data.append([
+            str(gasto.get('concepto', '')),
+            str(gasto.get('mes', '') or gasto.get('periodo', '')),
+            f"${int(gasto.get('monto', 0)):,}".replace(",", ".")
+        ])
+    
+    g_table = Table(g_data, colWidths=[200, 150, 140])
+    g_table.setStyle(TableStyle([
+        ('BACKGROUND', (0, 0), (-1, 0), colors.HexColor('#22252a')),
+        ('TEXTCOLOR', (0, 0), (-1, 0), colors.white),
+        ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),
+        ('FONTSIZE', (0, 0), (-1, -1), 8),
+        ('BOTTOMPADDING', (0, 0), (-1, -1), 5),
+        ('GRID', (0, 0), (-1, -1), 0.5, colors.HexColor('#dcdcdc'))
+    ]))
+    elements.append(g_table)
+
+    doc.build(elements)
+    buffer.seek(0)
+    return send_file(buffer, as_attachment=True, download_name=f"Reporte_Financiero_RLA_{date.today().strftime('%Y-%m-%d')}.pdf", mimetype='application/pdf')
 
 @app.route('/agregar_trabajo', methods=['POST'])
 @app.route('/guardar_trabajo', methods=['POST'])
