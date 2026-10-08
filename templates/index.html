@@ -397,4 +397,194 @@
             {% for item in datos %}
                 {% set partes_fecha = (item.fecha or '2026-01-01').split('-') %}
                 {% set num_mes = partes_fecha[1] if partes_fecha | length >= 2 else '01' %}
-                {% set anio_mes = partes_fecha[0] if partes_fecha
+                {% set anio_mes = partes_fecha[0] if partes_fecha | length >= 1 else '2026' %}
+                {% set nombre_mes_str = nombres_meses.get(num_mes, 'Otro') + ' ' + anio_mes %}
+                
+                {% if nombre_mes_str not in ns_t.trabajos_mes %}
+                    {% set _ = ns_t.trabajos_mes.update({nombre_mes_str: []}) %}
+                {% endif %}
+                {% set _ = ns_t.trabajos_mes[nombre_mes_str].append(item) %}
+            {% endfor %}
+
+            {% for mes, lista_t in ns_t.trabajos_mes.items() %}
+            <details class="mes-acordeon trabajo-acordeon">
+                <summary>
+                    <span>📅 {{ mes }}</span>
+                    <span style="font-size: 0.85rem; color: #555;">({{ lista_t | length }} facturas/trabajos)</span>
+                </summary>
+                <div class="contenido-acordeon">
+                    <table>
+                        <thead>
+                            <tr>
+                                <th>N° Factura</th>
+                                <th>Fecha</th>
+                                <th>Cliente</th>
+                                <th>Equipo / Servicio</th>
+                                <th>Neto</th>
+                                <th>IVA (19%)</th>
+                                <th>Total Bruto</th>
+                                <th>Estado</th>
+                                <th>Acciones</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for item in lista_t %}
+                            <tr>
+                                <td><strong>{{ item.n_factura }}</strong></td>
+                                <td>{{ item.fecha }}</td>
+                                <td>{{ item.cliente }}</td>
+                                <td><strong>{{ item.equipo }}</strong>: {{ item.servicio }}</td>
+                                <td>{{ item.neto | clp }}</td>
+                                <td>{{ item.iva | clp }}</td>
+                                <td><strong>{{ item.total_bruto | clp }}</strong></td>
+                                <td>{{ item.estado }}</td>
+                                <td>
+                                    {% if item.estado != 'Pagado' and item.estado != 'Completado' %}
+                                        <form action="/marcar_pagado/{{ item.id }}" method="POST" style="display:inline;">
+                                            <button type="submit" class="btn-action btn-pay" title="Marcar como Pagado">💰 Pagar</button>
+                                        </form>
+                                    {% endif %}
+                                    
+                                    <a href="/editar_trabajo/{{ item.id }}" class="btn-action btn-edit">✏️ Editar</a>
+                                </td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+            </details>
+            {% endfor %}
+        {% else %}
+            <div class="empty-table">No hay trabajos registrados todavía.</div>
+        {% endif %}
+    </div>
+
+</div>
+
+<script>
+    function toggleAcordeones(tipo, abrir) {
+        let selector = tipo === 'gastos' ? '.gasto-acordeon' : '.trabajo-acordeon';
+        let acordeones = document.querySelectorAll(selector);
+        acordeones.forEach(acc => {
+            if (abrir) {
+                acc.setAttribute('open', 'true');
+            } else {
+                acc.removeAttribute('open');
+            }
+        });
+    }
+
+    const trabajos = [
+        {% for item in datos %}
+            {
+                fecha: "{{ item.fecha }}",
+                ingreso: {% if item.estado | lower in ['pagado', 'completado'] %}{{ item.total_bruto }}{% else %}0{% endif %},
+                egreso: {{ item.gastos_op or 0 }}
+            },
+        {% endfor %}
+    ];
+
+    const gastosFijos = [
+        {% for gasto in gastos %}
+            {
+                mes: "{{ gasto.mes or gasto.periodo }}",
+                monto: {{ gasto.monto or 0 }}
+            },
+        {% endfor %}
+    ];
+
+    const mesesNombres = ["Ene", "Feb", "Mar", "Abr", "May", "Jun", "Jul", "Ago", "Sep", "Oct", "Nov", "Dic"];
+    let labels = [];
+    let ingresosMap = {};
+    let egresosMap = {};
+
+    for (let m = 0; m < 12; m++) {
+        let anio = 2026;
+        let key = `${anio}-${String(m + 1).padStart(2, '0')}`;
+        let label = `${mesesNombres[m]} ${anio}`;
+        labels.push(label);
+        ingresosMap[key] = 0;
+        egresosMap[key] = 0;
+    }
+
+    trabajos.forEach(t => {
+        if (t.fecha && t.fecha.startsWith("2026")) {
+            let key = t.fecha.substring(0, 7);
+            if (ingresosMap[key] !== undefined) {
+                ingresosMap[key] += t.ingreso;
+                egresosMap[key] += t.egreso;
+            }
+        }
+    });
+
+    const mapMesTexto = {
+        "enero": "2026-01", "january": "2026-01", "ene": "2026-01",
+        "febrero": "2026-02", "february": "2026-02", "feb": "2026-02",
+        "marzo": "2026-03", "march": "2026-03", "mar": "2026-03",
+        "abril": "2026-04", "april": "2026-04", "abr": "2026-04",
+        "mayo": "2026-05", "may": "2026-05",
+        "junio": "2026-06", "june": "2026-06", "jun": "2026-06",
+        "julio": "2026-07", "july": "2026-07", "jul": "2026-07",
+        "agosto": "2026-08", "august": "2026-08", "ago": "2026-08",
+        "septiembre": "2026-09", "september": "2026-09", "sep": "2026-09",
+        "octubre": "2026-10", "october": "2026-10", "oct": "2026-10",
+        "noviembre": "2026-11", "november": "2026-11", "nov": "2026-11",
+        "diciembre": "2026-12", "december": "2026-12", "dic": "2026-12"
+    };
+
+    gastosFijos.forEach(g => {
+        let textoMes = (g.mes || g.periodo || "").toLowerCase();
+        let encontradoKey = null;
+        for (let [nombre, keyVal] of Object.entries(mapMesTexto)) {
+            if (textoMes.includes(nombre)) {
+                encontradoKey = keyVal;
+                break;
+            }
+        }
+        if (encontradoKey && egresosMap[encontradoKey] !== undefined) {
+            egresosMap[encontradoKey] += g.monto;
+        }
+    });
+
+    let dataIngresos = Object.keys(ingresosMap).map(k => ingresosMap[k]);
+    let dataEgresos = Object.keys(egresosMap).map(k => egresosMap[k]);
+
+    const ctx = document.getElementById('financialChart').getContext('2d');
+    new Chart(ctx, {
+        type: 'bar',
+        data: {
+            labels: labels,
+            datasets: [
+                {
+                    label: 'Ingresos (Pagados)',
+                    data: dataIngresos,
+                    backgroundColor: '#28a745',
+                    borderRadius: 4
+                },
+                {
+                    label: 'Egresos (Op. & Fijos)',
+                    data: dataEgresos,
+                    backgroundColor: '#dc3545',
+                    borderRadius: 4
+                }
+            ]
+        },
+        options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            scales: {
+                y: {
+                    beginAtZero: true,
+                    ticks: {
+                        callback: function(value) {
+                            return '$' + value.toLocaleString('es-CL');
+                        }
+                    }
+                }
+            }
+        }
+    });
+</script>
+
+</body>
+</html>
