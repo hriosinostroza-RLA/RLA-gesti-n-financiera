@@ -26,7 +26,7 @@ def index():
     datos_gastos = []
     hoy = date.today()
 
-    # 1. Obtener Trabajos
+    # 1. Obtener Trabajos (Plazo de edición: 10 días)
     try:
         resp_trabajos = supabase.table("trabajos").select("*").execute()
         if resp_trabajos.data:
@@ -43,7 +43,7 @@ def index():
                     try:
                         f_reg = datetime.strptime(fecha_ref.split('T')[0], '%Y-%m-%d').date()
                         dias_transcurridos = (hoy - f_reg).days
-                        if 0 <= dias_transcurridos <= 30:
+                        if 0 <= dias_transcurridos <= 10:
                             editable = True
                     except Exception:
                         pass
@@ -53,7 +53,7 @@ def index():
     except Exception as e:
         print(f"Error al consultar trabajos en Supabase: {e}")
 
-    # 2. Obtener Gastos Fijos
+    # 2. Obtener Gastos Fijos (Plazo de edición: 10 días)
     try:
         resp_gastos = supabase.table("gastos_fijos").select("*").execute()
         if resp_gastos.data:
@@ -61,6 +61,22 @@ def index():
                 mes_val = item.get('mes') if item.get('mes') is not None else item.get('periodo', '')
                 item['mes'] = mes_val
                 item['periodo'] = mes_val
+                
+                editable = False
+                fecha_ref = item.get('created_at', '')
+                if fecha_ref:
+                    try:
+                        f_reg = datetime.strptime(fecha_ref.split('T')[0], '%Y-%m-%d').date()
+                        dias_transcurridos = (hoy - f_reg).days
+                        if 0 <= dias_transcurridos <= 10:
+                            editable = True
+                    except Exception:
+                        pass
+                else:
+                    # Si no tiene created_at registrado, permitimos editar por defecto o ajustamos
+                    editable = True
+                item['editable'] = editable
+
             datos_gastos = resp_gastos.data
     except Exception as e:
         print(f"Error al consultar gastos fijos en Supabase: {e}")
@@ -100,7 +116,8 @@ def agregar_trabajo():
             "neto": float(request.form.get('monto_neto') or 0),
             "gastos_op": float(request.form.get('gastos_op') or 0),
             "viaticos": float(request.form.get('viaticos') or 0),
-            "estado": request.form.get('estado', 'Pendiente')
+            "estado": request.form.get('estado', 'Pendiente'),
+            "created_at": datetime.now().isoformat()
         }
         supabase.table("trabajos").insert(nuevo_trabajo).execute()
     except Exception as e:
@@ -123,7 +140,8 @@ def agregar_gasto():
         nuevo_gasto = {
             "concepto": request.form.get('concepto', ''),
             "monto": float(request.form.get('monto') or 0),
-            "mes": request.form.get('periodo', '')
+            "mes": request.form.get('periodo', ''),
+            "created_at": datetime.now().isoformat()
         }
         supabase.table("gastos_fijos").insert(nuevo_gasto).execute()
     except Exception as e:
