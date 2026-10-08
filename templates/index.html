@@ -279,6 +279,7 @@
                     <th>Concepto</th>
                     <th>Periodo</th>
                     <th>Monto</th>
+                    <th>Acciones</th>
                 </tr>
             </thead>
             <tbody>
@@ -288,11 +289,16 @@
                         <td><strong>{{ gasto.concepto }}</strong></td>
                         <td>{{ gasto.mes }}</td>
                         <td>{{ gasto.monto | clp }}</td>
+                        <td>
+                            {% if gasto.editable %}
+                                <a href="#" class="btn-action btn-edit" title="Disponible por 10 días desde el registro">✏️ Editar</a>
+                            {% endif %}
+                        </td>
                     </tr>
                     {% endfor %}
                 {% else %}
                     <tr>
-                        <td colspan="3" class="empty-table">No hay gastos fijos registrados todavía.</td>
+                        <td colspan="4" class="empty-table">No hay gastos fijos registrados todavía.</td>
                     </tr>
                 {% endif %}
             </tbody>
@@ -336,7 +342,7 @@
                             {% endif %}
                             
                             {% if item.editable %}
-                                <a href="#" class="btn-action btn-edit" title="Disponible por 30 días desde el registro">✏️ Editar</a>
+                                <a href="#" class="btn-action btn-edit" title="Disponible por 10 días desde el registro">✏️ Editar</a>
                             {% endif %}
                         </td>
                     </tr>
