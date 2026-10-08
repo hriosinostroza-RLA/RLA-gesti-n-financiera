@@ -4,7 +4,6 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>RLA | Gestión Financiera y Técnica</title>
-    <!-- Incluir Chart.js para gráficos -->
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <style>
         :root {
@@ -190,13 +189,11 @@
 
 <div class="container">
 
-    <!-- Barra Superior -->
     <div class="header-bar">
         <span>⚙️ RLA | Gestión Financiera y Técnica</span>
         <a href="/exportar_pdf" class="btn-pdf" target="_blank">📄 Exportar a PDF</a>
     </div>
 
-    <!-- Panel de Balance (Grid 2x2) -->
     <div class="grid-cards">
         <div class="card green">
             <div class="card-title">Ingresos (Pagados con IVA)</div>
@@ -216,7 +213,6 @@
         </div>
     </div>
 
-    <!-- Gráficos de 12 Meses (Enero a Diciembre 2026) -->
     <div class="section-box">
         <div class="section-title">📊 Resumen Financiero Mensual (Enero - Diciembre 2026)</div>
         <div class="chart-container">
@@ -224,7 +220,6 @@
         </div>
     </div>
 
-    <!-- Formulario: Nuevo Trabajo / Servicio Técnico -->
     <div class="section-box">
         <div class="section-title">📄 Nuevo Trabajo / Servicio Técnico</div>
         <form action="/agregar_trabajo" method="POST">
@@ -277,7 +272,6 @@
         </form>
     </div>
 
-    <!-- Formulario: Registro de Gasto Fijo Mensual -->
     <div class="section-box">
         <div class="section-title">📉 Registro de Gasto Fijo Mensual</div>
         <form action="/agregar_gasto" method="POST">
@@ -299,7 +293,6 @@
         </form>
     </div>
 
-    <!-- Historial de Gastos Fijos -->
     <div class="section-box">
         <div class="section-title">📋 Historial de Gastos Fijos</div>
         <table>
@@ -319,9 +312,7 @@
                         <td>{{ gasto.mes }}</td>
                         <td>{{ gasto.monto | clp }}</td>
                         <td>
-                            {% if gasto.editable %}
-                                <a href="#" class="btn-action btn-edit" title="Disponible por 10 días desde el registro">✏️ Editar</a>
-                            {% endif %}
+                            <a href="/editar_gasto/{{ gasto.id }}" class="btn-action btn-edit">✏️ Editar</a>
                         </td>
                     </tr>
                     {% endfor %}
@@ -334,7 +325,6 @@
         </table>
     </div>
 
-    <!-- Historial de Trabajos y Servicios -->
     <div class="section-box">
         <div class="section-title">📋 Historial de Trabajos y Servicios</div>
         <table>
@@ -370,9 +360,7 @@
                                 </form>
                             {% endif %}
                             
-                            {% if item.editable %}
-                                <a href="#" class="btn-action btn-edit" title="Disponible por 10 días desde el registro">✏️ Editar</a>
-                            {% endif %}
+                            <a href="/editar_trabajo/{{ item.id }}" class="btn-action btn-edit">✏️ Editar</a>
                         </td>
                     </tr>
                     {% endfor %}
@@ -388,7 +376,6 @@
 </div>
 
 <script>
-    // Procesar datos de trabajos y gastos fijos
     const trabajos = [
         {% for item in datos %}
             {
@@ -408,7 +395,6 @@
         {% endfor %}
     ];
 
-    // Definir los 12 meses fijos del año 2026 (Enero a Diciembre)
     const mesesNombres = ["Ene", "Feb", "Mar", "Abr", "May", "Jun", "Jul", "Ago", "Sep", "Oct", "Nov", "Dic"];
     let labels = [];
     let ingresosMap = {};
@@ -423,10 +409,9 @@
         egresosMap[key] = 0;
     }
 
-    // Agrupar ingresos y gastos operativos de los trabajos por mes (año 2026)
     trabajos.forEach(t => {
         if (t.fecha && t.fecha.startsWith("2026")) {
-            let key = t.fecha.substring(0, 7); // YYYY-MM
+            let key = t.fecha.substring(0, 7);
             if (ingresosMap[key] !== undefined) {
                 ingresosMap[key] += t.ingreso;
                 egresosMap[key] += t.egreso;
@@ -434,7 +419,6 @@
         }
     });
 
-    // Mapeo inteligente para los gastos fijos según el texto del mes registrado
     const mapMesTexto = {
         "enero": "2026-01", "january": "2026-01",
         "febrero": "2026-02", "february": "2026-02",
