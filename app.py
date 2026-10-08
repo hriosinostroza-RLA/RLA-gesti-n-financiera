@@ -86,14 +86,15 @@ def exportar_pdf():
     elements = []
     
     styles = getSampleStyleSheet()
-    title_style = ParagraphStyle('TitleStyle', parent=styles['Heading1'], fontSize=16, textColor=colors.HexColor('#22252a'), spaceAfter=12)
-    subtitle_style = ParagraphStyle('SubTitleStyle', parent=styles['Heading2'], fontSize=12, textColor=colors.HexColor('#444444'), spaceAfter=6, spaceBefore=12)
+    title_style = ParagraphStyle('TitleStyle', parent=styles['Heading1'], fontSize=16, textColor=colors.HexColor('#22252a'), spaceAfter=6)
+    subtitle_style = ParagraphStyle('SubTitleStyle', parent=styles['Heading2'], fontSize=12, textColor=colors.HexColor('#444444'), spaceAfter=6, spaceBefore=10)
     normal_style = styles['Normal']
 
     elements.append(Paragraph("<b>RLA | Gestión Financiera y Técnica</b>", title_style))
     elements.append(Paragraph(f"Reporte generado el: {date.today().strftime('%d-%m-%Y')}", normal_style))
-    elements.append(Spacer(1, 15))
+    elements.append(Spacer(1, 10))
 
+    # Obtener datos para calcular los totales del balance
     try:
         resp_trabajos = supabase.table("trabajos").select("*").execute()
         datos_trabajos = resp_trabajos.data if resp_trabajos.data else []
@@ -105,6 +106,38 @@ def exportar_pdf():
         datos_gastos = resp_gastos.data if resp_gastos.data else []
     except Exception:
         datos_gastos = []
+
+    total_ingresos = sum(float(item.get('neto', item.get('monto_neto', 0)) * 1.19) for item in datos_trabajos if str(item.get('estado', '')).lower() in ['pagado', 'completado'])
+    total_pendientes = sum(float(item.get('neto', item.get('monto_neto', 0)) * 1.19) for item in datos_trabajos if str(item.get('estado', '')).lower() not in ['pagado', 'completado'])
+    total_gastos_op = sum(float(item.get('gastos_op') or 0) for item in datos_trabajos)
+    total_gastos_fijos = sum(float(item.get('monto') or 0) for item in datos_gastos)
+    egresos = total_gastos_op + total_gastos_fijos
+    capital_disponible = total_ingresos - egresos
+
+    # Tabla de Balance General (4 indicadores)
+    elements.append(Paragraph("<b>Resumen de Balance General</b>", subtitle_style))
+    balance_data = [
+        ["Ingresos (Pagados con IVA)", "Por Cobrar (Pendientes)", "Egresos Op. & Fijos", "Capital Disponible"],
+        [
+            f"${int(total_ingresos):,}".replace(",", "."),
+            f"${int(total_pendientes):,}".replace(",", "."),
+            f"${int(egresos):,}".replace(",", "."),
+            f"${int(capital_disponible):,}".replace(",", ".")
+        ]
+    ]
+    balance_table = Table(balance_data, colWidths=[135, 135, 135, 135])
+    balance_table.setStyle(TableStyle([
+        ('BACKGROUND', (0, 0), (-1, 0), colors.HexColor('#343a40')),
+        ('TEXTCOLOR', (0, 0), (-1, 0), colors.white),
+        ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),
+        ('FONTSIZE', (0, 0), (-1, -1), 8),
+        ('ALIGN', (0, 0), (-1, -1), 'CENTER'),
+        ('BOTTOMPADDING', (0, 0), (-1, -1), 6),
+        ('TOPPADDING', (0, 0), (-1, -1), 6),
+        ('GRID', (0, 0), (-1, -1), 0.5, colors.HexColor('#dcdcdc'))
+    ]))
+    elements.append(balance_table)
+    elements.append(Spacer(1, 15))
 
     # Tabla Trabajos PDF
     elements.append(Paragraph("<b>Historial de Trabajos y Servicios</b>", subtitle_style))
@@ -229,7 +262,6 @@ def agregar_gasto():
             "monto": float(request.form.get('monto') or 0),
             "mes": periodo_val
         }
-        print(f"Insertando gasto fijo en Supabase: {nuevo_gasto}")
         supabase.table("gastos_fijos").insert(nuevo_gasto).execute()
     except Exception as e:
         print(f"❌ Error al guardar el gasto fijo en Supabase: {e}")
