@@ -3,8 +3,14 @@ import io
 from datetime import datetime, date
 from flask import Flask, render_template, request, redirect, url_for, send_file
 from supabase import create_client, Client
+
+# Configurar matplotlib en modo headless para servidores sin interfaz gráfica
+import matplotlib
+matplotlib.use('Agg')
+import matplotlib.pyplot as plt
+
 from reportlab.lib.pagesizes import letter
-from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer, Table, TableStyle
+from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer, Table, TableStyle, Image
 from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
 from reportlab.lib import colors
 
@@ -86,15 +92,15 @@ def exportar_pdf():
     elements = []
     
     styles = getSampleStyleSheet()
-    title_style = ParagraphStyle('TitleStyle', parent=styles['Heading1'], fontSize=16, textColor=colors.HexColor('#22252a'), spaceAfter=6)
-    subtitle_style = ParagraphStyle('SubTitleStyle', parent=styles['Heading2'], fontSize=12, textColor=colors.HexColor('#444444'), spaceAfter=6, spaceBefore=10)
+    title_style = ParagraphStyle('TitleStyle', parent=styles['Heading1'], fontSize=16, textColor=colors.HexColor('#22252a'), spaceAfter=4)
+    subtitle_style = ParagraphStyle('SubTitleStyle', parent=styles['Heading2'], fontSize=11, textColor=colors.HexColor('#444444'), spaceAfter=4, spaceBefore=8)
     normal_style = styles['Normal']
 
     elements.append(Paragraph("<b>RLA | Gestión Financiera y Técnica</b>", title_style))
     elements.append(Paragraph(f"Reporte generado el: {date.today().strftime('%d-%m-%Y')}", normal_style))
-    elements.append(Spacer(1, 10))
+    elements.append(Spacer(1, 8))
 
-    # Obtener datos para calcular los totales del balance
+    # Obtener datos de Supabase
     try:
         resp_trabajos = supabase.table("trabajos").select("*").execute()
         datos_trabajos = resp_trabajos.data if resp_trabajos.data else []
@@ -114,7 +120,7 @@ def exportar_pdf():
     egresos = total_gastos_op + total_gastos_fijos
     capital_disponible = total_ingresos - egresos
 
-    # Tabla de Balance General (4 indicadores)
+    # 1. Tabla de Balance General (4 indicadores)
     elements.append(Paragraph("<b>Resumen de Balance General</b>", subtitle_style))
     balance_data = [
         ["Ingresos (Pagados con IVA)", "Por Cobrar (Pendientes)", "Egresos Op. & Fijos", "Capital Disponible"],
@@ -132,14 +138,79 @@ def exportar_pdf():
         ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),
         ('FONTSIZE', (0, 0), (-1, -1), 8),
         ('ALIGN', (0, 0), (-1, -1), 'CENTER'),
-        ('BOTTOMPADDING', (0, 0), (-1, -1), 6),
-        ('TOPPADDING', (0, 0), (-1, -1), 6),
+        ('BOTTOMPADDING', (0, 0), (-1, -1), 5),
+        ('TOPPADDING', (0, 0), (-1, -1), 5),
         ('GRID', (0, 0), (-1, -1), 0.5, colors.HexColor('#dcdcdc'))
     ]))
     elements.append(balance_table)
-    elements.append(Spacer(1, 15))
+    elements.append(Spacer(1, 10))
 
-    # Tabla Trabajos PDF
+    # 2. Generar Gráfico con Matplotlib e insertarlo en el PDF
+    meses_nombres = ["Ene", "Feb", "Mar", "Abr", "May", "Jun", "Jul", "Ago", "Sep", "Oct", "Nov", "Dic"]
+    ingresos_mensuales = [0] * 12
+    egresos_mensuales = [0] * 12
+
+    for item in datos_trabajos:
+        fecha = str(item.get('fecha', ''))
+        if fecha.startswith("2026"):
+            try:
+                m = int(fecha.split('-')[1]) - 1
+                if 0 <= m < 12:
+                    if str(item.get('estado', '')).lower() in ['pagado', 'completado']:
+                        neto_val = float(item.get('neto', item.get('monto_neto', 0)))
+                        ingresos_mensuales[m] += neto_val * 1.19
+                    egresos_mensuales[m] += float(item.get('gastos_op', 0))
+            except Exception:
+                pass
+
+    map_mes_texto = {
+        "enero": 0, "january": 0, "ene": 0,
+        "febrero": 1, "february": 1, "feb": 1,
+        "marzo": 2, "march": 2, "mar": 2,
+        "abril": 3, "april": 3, "abr": 3,
+        "mayo": 4, "may": 4,
+        "junio": 5, "june": 5, "jun": 5,
+        "julio": 6, "july": 6, "jul": 6,
+        "agosto": 7, "august": 7, "ago": 7,
+        "septiembre": 8, "september": 8, "sep": 8,
+        "octubre": 9, "october": 9, "oct": 9,
+        "noviembre": 10, "november": 10, "nov": 10,
+        "diciembre": 11, "december": 11, "dic": 11
+    }
+
+    for gasto in datos_gastos:
+        texto_mes = str(gasto.get('mes') or gasto.get('periodo') or '').lower()
+        m_idx = None
+        for nombre, idx in map_mes_texto.items():
+            if nombre in texto_mes:
+                m_idx = idx
+                break
+        if m_idx is not None:
+            egresos_mensuales[m_idx] += float(gasto.get('monto', 0))
+
+    fig, ax = plt.subplots(figsize=(7, 2.5))
+    x = range(12)
+    width = 0.35
+    ax.bar([i - width/2 for i in x], ingresos_mensuales, width, label='Ingresos (Pagados)', color='#28a745')
+    ax.bar([i + width/2 for i in x], egresos_mensuales, width, label='Egresos (Op. & Fijos)', color='#dc3545')
+    ax.set_xticks(list(x))
+    ax.set_xticklabels(meses_nombres, fontsize=8)
+    ax.legend(fontsize=7, loc='upper right')
+    ax.set_title("Resumen Financiero Mensual (2026)", fontsize=9, fontweight='bold')
+    ax.spines['top'].set_visible(False)
+    ax.spines['right'].set_visible(False)
+    plt.tight_layout()
+
+    chart_buffer = io.BytesIO()
+    plt.savefig(chart_buffer, format='png', dpi=150)
+    plt.close()
+    chart_buffer.seek(0)
+
+    elements.append(Paragraph("<b>Gráfico Resumen Financiero Mensual</b>", subtitle_style))
+    elements.append(Image(chart_buffer, width=500, height=180))
+    elements.append(Spacer(1, 10))
+
+    # 3. Tabla Trabajos PDF
     elements.append(Paragraph("<b>Historial de Trabajos y Servicios</b>", subtitle_style))
     t_data = [["Factura", "Fecha", "Cliente", "Equipo", "Neto", "Estado"]]
     for item in datos_trabajos:
@@ -159,13 +230,14 @@ def exportar_pdf():
         ('TEXTCOLOR', (0, 0), (-1, 0), colors.white),
         ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),
         ('FONTSIZE', (0, 0), (-1, -1), 8),
-        ('BOTTOMPADDING', (0, 0), (-1, -1), 5),
+        ('BOTTOMPADDING', (0, 0), (-1, -1), 4),
+        ('TOPPADDING', (0, 0), (-1, -1), 4),
         ('GRID', (0, 0), (-1, -1), 0.5, colors.HexColor('#dcdcdc'))
     ]))
     elements.append(t_table)
-    elements.append(Spacer(1, 15))
+    elements.append(Spacer(1, 10))
 
-    # Tabla Gastos Fijos PDF
+    # 4. Tabla Gastos Fijos PDF
     elements.append(Paragraph("<b>Historial de Gastos Fijos</b>", subtitle_style))
     g_data = [["Concepto", "Periodo / Mes", "Monto"]]
     for gasto in datos_gastos:
@@ -181,7 +253,8 @@ def exportar_pdf():
         ('TEXTCOLOR', (0, 0), (-1, 0), colors.white),
         ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),
         ('FONTSIZE', (0, 0), (-1, -1), 8),
-        ('BOTTOMPADDING', (0, 0), (-1, -1), 5),
+        ('BOTTOMPADDING', (0, 0), (-1, -1), 4),
+        ('TOPPADDING', (0, 0), (-1, -1), 4),
         ('GRID', (0, 0), (-1, -1), 0.5, colors.HexColor('#dcdcdc'))
     ]))
     elements.append(g_table)
