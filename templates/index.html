@@ -87,19 +87,6 @@
             border-radius: 6px;
             font-size: 1rem;
             margin: -25px -25px 20px -25px;
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-        }
-        .section-title select {
-            padding: 6px 10px;
-            border-radius: 4px;
-            border: none;
-            font-size: 0.9rem;
-            font-weight: bold;
-            background-color: #ffffff;
-            color: #333;
-            cursor: pointer;
         }
         .form-grid {
             display: grid;
@@ -155,18 +142,49 @@
         .btn-pay:hover { background-color: #218838; }
         .btn-edit { background-color: #17a2b8; color: white; }
         .btn-edit:hover { background-color: #138496; }
+        
+        /* Estilos para los Acordeones de Meses */
+        details.mes-acordeon {
+            background: #f8f9fa;
+            border: 1px solid var(--border-color);
+            border-radius: 6px;
+            margin-bottom: 10px;
+            overflow: hidden;
+        }
+        details.mes-acordeon summary {
+            background-color: #e9ecef;
+            color: #212529;
+            padding: 12px 15px;
+            font-weight: bold;
+            cursor: pointer;
+            font-size: 0.95rem;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            user-select: none;
+        }
+        details.mes-acordeon summary:hover {
+            background-color: #dde2e6;
+        }
+        details.mes-acordeon[open] summary {
+            border-bottom: 1px solid var(--border-color);
+        }
+        .contenido-acordeon {
+            padding: 10px;
+            background: #ffffff;
+        }
+
         table {
             width: 100%;
             border-collapse: collapse;
-            margin-top: 10px;
         }
         th, td {
-            padding: 12px;
+            padding: 10px 12px;
             text-align: left;
             border-bottom: 1px solid var(--border-color);
             font-size: 0.9rem;
         }
-        th { background-color: var(--primary-dark); color: white; }
+        th { background-color: #343a40; color: white; }
         .empty-table {
             text-align: center;
             color: #777;
@@ -288,159 +306,128 @@
     </div>
 
     <div class="section-box">
-        <div class="section-title">
-            <span>📋 Historial de Gastos Fijos</span>
-            <select id="filtroMesGastos" onchange="filtrarGastos()">
-                <option value="todos">📅 Todos los meses</option>
-                <option value="enero">Enero</option>
-                <option value="febrero">Febrero</option>
-                <option value="marzo">Marzo</option>
-                <option value="abril">Abril</option>
-                <option value="mayo">Mayo</option>
-                <option value="junio">Junio</option>
-                <option value="julio">Julio</option>
-                <option value="agosto">Agosto</option>
-                <option value="septiembre">Septiembre</option>
-                <option value="octubre">Octubre</option>
-                <option value="noviembre">Noviembre</option>
-                <option value="diciembre">Diciembre</option>
-            </select>
-        </div>
-        <table id="tablaGastos">
-            <thead>
-                <tr>
-                    <th>Concepto</th>
-                    <th>Periodo</th>
-                    <th>Monto</th>
-                    <th>Acciones</th>
-                </tr>
-            </thead>
-            <tbody>
-                {% if gastos %}
-                    {% for gasto in gastos %}
-                    <tr class="fila-gasto" data-periodo="{{ (gasto.mes or gasto.periodo or '') | lower }}">
-                        <td><strong>{{ gasto.concepto }}</strong></td>
-                        <td>{{ gasto.mes or gasto.periodo }}</td>
-                        <td>{{ gasto.monto | clp }}</td>
-                        <td>
-                            <a href="/editar_gasto/{{ gasto.id }}" class="btn-action btn-edit">✏️ Editar</a>
-                        </td>
-                    </tr>
-                    {% endfor %}
-                {% else %}
-                    <tr>
-                        <td colspan="4" class="empty-table">No hay gastos fijos registrados todavía.</td>
-                    </tr>
+        <div class="section-title">📋 Historial de Gastos Fijos (Agrupado por Mes)</div>
+        {% if gastos %}
+            {% set gastos_por_mes = {} %}
+            {% for g in gastos %}
+                {% set mes_key = (g.mes or g.periodo or 'Sin Especificar') | title %}
+                {% if mes_key not in gastos_por_mes %}
+                    {% set _ = gastos_por_mes.update({mes_key: []}) %}
                 {% endif %}
-            </tbody>
-        </table>
+                {% set _ = gastos_por_mes[mes_key].append(g) %}
+            {% endfor %}
+
+            {% for mes, lista_g in gastos_por_mes.items() %}
+            <details class="mes-acordeon">
+                <summary>
+                    <span>📅 {{ mes }}</span>
+                    <span style="font-size: 0.85rem; color: #555;">({{ lista_g | length }} registros)</span>
+                </summary>
+                <div class="contenido-acordeon">
+                    <table>
+                        <thead>
+                            <tr>
+                                <th>Concepto</th>
+                                <th>Periodo</th>
+                                <th>Monto</th>
+                                <th>Acciones</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for gasto in lista_g %}
+                            <tr>
+                                <td><strong>{{ gasto.concepto }}</strong></td>
+                                <td>{{ gasto.mes or gasto.periodo }}</td>
+                                <td>{{ gasto.monto | clp }}</td>
+                                <td>
+                                    <a href="/editar_gasto/{{ gasto.id }}" class="btn-action btn-edit">✏️ Editar</a>
+                                </td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+            </details>
+            {% endfor %}
+        {% else %}
+            <div class="empty-table">No hay gastos fijos registrados todavía.</div>
+        {% endif %}
     </div>
 
     <div class="section-box">
-        <div class="section-title">
-            <span>📋 Historial de Trabajos y Servicios</span>
-            <select id="filtroMesTrabajos" onchange="filtrarTrabajos()">
-                <option value="todos">📅 Todos los meses</option>
-                <option value="01">Enero</option>
-                <option value="02">Febrero</option>
-                <option value="03">Marzo</option>
-                <option value="04">Abril</option>
-                <option value="05">Mayo</option>
-                <option value="06">Junio</option>
-                <option value="07">Julio</option>
-                <option value="08">Agosto</option>
-                <option value="09">Septiembre</option>
-                <option value="10">Octubre</option>
-                <option value="11">Noviembre</option>
-                <option value="12">Diciembre</option>
-            </select>
-        </div>
-        <table id="tablaTrabajos">
-            <thead>
-                <tr>
-                    <th>N° Factura</th>
-                    <th>Fecha</th>
-                    <th>Cliente</th>
-                    <th>Equipo / Servicio</th>
-                    <th>Neto</th>
-                    <th>IVA (19%)</th>
-                    <th>Total Bruto</th>
-                    <th>Estado</th>
-                    <th>Acciones</th>
-                </tr>
-            </thead>
-            <tbody>
-                {% if datos %}
-                    {% for item in datos %}
-                    <tr class="fila-trabajo" data-fecha="{{ item.fecha }}">
-                        <td><strong>{{ item.n_factura }}</strong></td>
-                        <td>{{ item.fecha }}</td>
-                        <td>{{ item.cliente }}</td>
-                        <td><strong>{{ item.equipo }}</strong>: {{ item.servicio }}</td>
-                        <td>{{ item.neto | clp }}</td>
-                        <td>{{ item.iva | clp }}</td>
-                        <td><strong>{{ item.total_bruto | clp }}</strong></td>
-                        <td>{{ item.estado }}</td>
-                        <td>
-                            {% if item.estado != 'Pagado' and item.estado != 'Completado' %}
-                                <form action="/marcar_pagado/{{ item.id }}" method="POST" style="display:inline;">
-                                    <button type="submit" class="btn-action btn-pay" title="Marcar como Pagado">💰 Pagar</button>
-                                </form>
-                            {% endif %}
-                            
-                            <a href="/editar_trabajo/{{ item.id }}" class="btn-action btn-edit">✏️ Editar</a>
-                        </td>
-                    </tr>
-                    {% endfor %}
-                {% else %}
-                    <tr>
-                        <td colspan="9" class="empty-table">No hay trabajos registrados todavía.</td>
-                    </tr>
+        <div class="section-title">📋 Historial de Trabajos y Servicios (Agrupado por Mes)</div>
+        {% if datos %}
+            {% set trabajos_por_mes = {} %}
+            {% set nombres_meses = {'01':'Enero', '02':'Febrero', '03':'Marzo', '04':'Abril', '05':'Mayo', '06':'Junio', '07':'Julio', '08':'Agosto', '09':'Septiembre', '10':'Octubre', '11':'Noviembre', '12':'Diciembre'} %}
+            
+            {% for item in datos %}
+                {% set partes_fecha = (item.fecha or '2026-01-01').split('-') %}
+                {% set num_mes = partes_fecha[1] if partes_fecha | length >= 2 else '01' %}
+                {% set anio_mes = partes_fecha[0] if partes_fecha | length >= 1 else '2026' %}
+                {% set nombre_mes_str = nombres_meses.get(num_mes, 'Otro') + ' ' + anio_mes %}
+                
+                {% if nombre_mes_str not in trabajos_por_mes %}
+                    {% set _ = trabajos_por_mes.update({nombre_mes_str: []}) %}
                 {% endif %}
-            </tbody>
-        </table>
+                {% set _ = trabajos_por_mes[nombre_mes_str].append(item) %}
+            {% endfor %}
+
+            {% for mes, lista_t in trabajos_por_mes.items() %}
+            <details class="mes-acordeon">
+                <summary>
+                    <span>📅 {{ mes }}</span>
+                    <span style="font-size: 0.85rem; color: #555;">({{ lista_t | length }} trabajos)</span>
+                </summary>
+                <div class="contenido-acordeon">
+                    <table>
+                        <thead>
+                            <tr>
+                                <th>N° Factura</th>
+                                <th>Fecha</th>
+                                <th>Cliente</th>
+                                <th>Equipo / Servicio</th>
+                                <th>Neto</th>
+                                <th>IVA (19%)</th>
+                                <th>Total Bruto</th>
+                                <th>Estado</th>
+                                <th>Acciones</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for item in lista_t %}
+                            <tr>
+                                <td><strong>{{ item.n_factura }}</strong></td>
+                                <td>{{ item.fecha }}</td>
+                                <td>{{ item.cliente }}</td>
+                                <td><strong>{{ item.equipo }}</strong>: {{ item.servicio }}</td>
+                                <td>{{ item.neto | clp }}</td>
+                                <td>{{ item.iva | clp }}</td>
+                                <td><strong>{{ item.total_bruto | clp }}</strong></td>
+                                <td>{{ item.estado }}</td>
+                                <td>
+                                    {% if item.estado != 'Pagado' and item.estado != 'Completado' %}
+                                        <form action="/marcar_pagado/{{ item.id }}" method="POST" style="display:inline;">
+                                            <button type="submit" class="btn-action btn-pay" title="Marcar como Pagado">💰 Pagar</button>
+                                        </form>
+                                    {% endif %}
+                                    
+                                    <a href="/editar_trabajo/{{ item.id }}" class="btn-action btn-edit">✏️ Editar</a>
+                                </td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+            </details>
+            {% endfor %}
+        {% else %}
+            <div class="empty-table">No hay trabajos registrados todavía.</div>
+        {% endif %}
     </div>
 
 </div>
 
 <script>
-    function filtrarGastos() {
-        let mesSeleccionado = document.getElementById('filtroMesGastos').value;
-        let filas = document.querySelectorAll('.fila-gasto');
-        
-        filas.forEach(fila => {
-            let periodo = fila.getAttribute('data-periodo');
-            if (mesSeleccionado === 'todos' || periodo.includes(mesSeleccionado)) {
-                fila.style.display = '';
-            } else {
-                fila.style.display = 'none';
-            }
-        });
-    }
-
-    function filtrarTrabajos() {
-        let mesSeleccionado = document.getElementById('filtroMesTrabajos').value; // Ej: "03"
-        let filas = document.querySelectorAll('.fila-trabajo');
-        
-        filas.forEach(fila => {
-            let fecha = fila.getAttribute('data-fecha'); // Formato YYYY-MM-DD
-            if (mesSeleccionado === 'todos') {
-                fila.style.display = '';
-            } else if (fecha) {
-                // Extraemos el mes de la fecha (por ejemplo, de "2026-03-15" extrae "03")
-                let partes = fecha.split('-');
-                let mesFecha = partes.length >= 2 ? partes[1] : '';
-                if (mesFecha === mesSeleccionado) {
-                    fila.style.display = '';
-                } else {
-                    fila.style.display = 'none';
-                }
-            } else {
-                fila.style.display = 'none';
-            }
-        });
-    }
-
     const trabajos = [
         {% for item in datos %}
             {
