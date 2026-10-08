@@ -331,7 +331,7 @@
         {% if gastos %}
             {% set ns = namespace(gastos_mes={}) %}
             {% for g in gastos %}
-                {% set periodo_bruto = (g.mes or g.periodo or 'Sin Especificar') | trim | title %}
+                {% set periodo_bruto = (g.mes or g.periodo or 'Sin Especificar') | string | trim | title %}
                 {% if periodo_bruto not in ns.gastos_mes %}
                     {% set _ = ns.gastos_mes.update({periodo_bruto: []}) %}
                 {% endif %}
@@ -455,7 +455,6 @@
 </div>
 
 <script>
-    // Función para abrir o cerrar todos los acordeones a la vez
     function toggleAcordeones(tipo, abrir) {
         let selector = tipo === 'gastos' ? '.gasto-acordeon' : '.trabajo-acordeon';
         let acordeones = document.querySelectorAll(selector);
@@ -512,18 +511,18 @@
     });
 
     const mapMesTexto = {
-        "enero": "2026-01", "january": "2026-01",
-        "febrero": "2026-02", "february": "2026-02",
-        "marzo": "2026-03", "march": "2026-03",
-        "abril": "2026-04", "april": "2026-04",
+        "enero": "2026-01", "january": "2026-01", "ene": "2026-01",
+        "febrero": "2026-02", "february": "2026-02", "feb": "2026-02",
+        "marzo": "2026-03", "march": "2026-03", "mar": "2026-03",
+        "abril": "2026-04", "april": "2026-04", "abr": "2026-04",
         "mayo": "2026-05", "may": "2026-05",
-        "junio": "2026-06", "june": "2026-06",
-        "julio": "2026-07", "july": "2026-07",
-        "agosto": "2026-08", "august": "2026-08",
-        "septiembre": "2026-09", "september": "2026-09",
-        "octubre": "2026-10", "october": "2026-10",
-        "noviembre": "2026-11", "november": "2026-11",
-        "diciembre": "2026-12", "december": "2026-12"
+        "junio": "2026-06", "june": "2026-06", "jun": "2026-06",
+        "julio": "2026-07", "july": "2026-07", "jul": "2026-07",
+        "agosto": "2026-08", "august": "2026-08", "ago": "2026-08",
+        "septiembre": "2026-09", "september": "2026-09", "sep": "2026-09",
+        "octubre": "2026-10", "october": "2026-10", "oct": "2026-10",
+        "noviembre": "2026-11", "november": "2026-11", "nov": "2026-11",
+        "diciembre": "2026-12", "december": "2026-12", "dic": "2026-12"
     };
 
     gastosFijos.forEach(g => {
