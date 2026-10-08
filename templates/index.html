@@ -270,6 +270,35 @@
         </form>
     </div>
 
+    <!-- Historial de Gastos Fijos -->
+    <div class="section-box">
+        <div class="section-title">📋 Historial de Gastos Fijos</div>
+        <table>
+            <thead>
+                <tr>
+                    <th>Concepto</th>
+                    <th>Periodo</th>
+                    <th>Monto</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% if gastos %}
+                    {% for gasto in gastos %}
+                    <tr>
+                        <td><strong>{{ gasto.concepto }}</strong></td>
+                        <td>{{ gasto.periodo }}</td>
+                        <td>{{ gasto.monto | clp }}</td>
+                    </tr>
+                    {% endfor %}
+                {% else %}
+                    <tr>
+                        <td colspan="3" class="empty-table">No hay gastos fijos registrados todavía.</td>
+                    </tr>
+                {% endif %}
+            </tbody>
+        </table>
+    </div>
+
     <!-- Historial de Trabajos y Servicios -->
     <div class="section-box">
         <div class="section-title">📋 Historial de Trabajos y Servicios</div>
@@ -307,7 +336,7 @@
                             {% endif %}
                             
                             {% if item.editable %}
-                                <a href="#" class="btn-action btn-edit" title="Disponible por 30 días">✏️ Editar</a>
+                                <a href="#" class="btn-action btn-edit" title="Disponible por 30 días desde el registro">✏️ Editar</a>
                             {% endif %}
                         </td>
                     </tr>
