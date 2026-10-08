@@ -42,18 +42,8 @@ def index():
                 item['iva'] = neto_val * 0.19
                 item['total_bruto'] = neto_val * 1.19
                 
-                editable = False
-                fecha_ref = item.get('created_at')
-                if fecha_ref:
-                    try:
-                        f_reg = datetime.strptime(fecha_ref.split('T')[0], '%Y-%m-%d').date()
-                        if (hoy - f_reg).days <= 10:
-                            editable = True
-                    except Exception:
-                        pass
-                else:
-                    editable = True
-                item['editable'] = editable
+                # Deshabilitamos la restricción de 10 días para que el botón de editar SIEMPRE aparezca activo
+                item['editable'] = True
 
             datos_trabajos = resp_trabajos.data
     except Exception as e:
@@ -68,18 +58,8 @@ def index():
                 item['mes'] = mes_val
                 item['periodo'] = mes_val
                 
-                editable = False
-                fecha_ref = item.get('created_at')
-                if fecha_ref:
-                    try:
-                        f_reg = datetime.strptime(fecha_ref.split('T')[0], '%Y-%m-%d').date()
-                        if (hoy - f_reg).days <= 10:
-                            editable = True
-                    except Exception:
-                        pass
-                else:
-                    editable = True
-                item['editable'] = editable
+                # Deshabilitamos la restricción de 10 días para que el botón de editar SIEMPRE aparezca activo
+                item['editable'] = True
 
             datos_gastos = resp_gastos.data
     except Exception as e:
@@ -275,31 +255,4 @@ def agregar_gasto():
     
     return redirect(url_for('index'))
 
-@app.route('/editar_gasto/<int:id>', methods=['GET', 'POST'])
-def editar_gasto(id):
-    if request.method == 'POST':
-        try:
-            datos_actualizados = {
-                "concepto": request.form.get('concepto', ''),
-                "monto": float(request.form.get('monto') or 0),
-                "mes": request.form.get('periodo', '')
-            }
-            supabase.table("gastos_fijos").update(datos_actualizados).eq("id", id).execute()
-        except Exception as e:
-            print(f"Error al actualizar gasto fijo: {e}")
-        return redirect(url_for('index'))
-    
-    try:
-        resp = supabase.table("gastos_fijos").select("*").eq("id", id).execute()
-        gasto = resp.data[0] if resp.data else None
-        if gasto:
-            gasto['periodo'] = gasto.get('mes') or gasto.get('periodo', '')
-    except Exception as e:
-        print(f"Error al obtener gasto fijo para editar: {e}")
-        gasto = None
-
-    return render_template('editar_gasto.html', gasto=gasto)
-
-if __name__ == '__main__':
-    port = int(os.environ.get("PORT", 5000))
-    app.run(host='0.0.0.0', port=port)
+@app.route('/editar_gasto/<int:id>', methods
