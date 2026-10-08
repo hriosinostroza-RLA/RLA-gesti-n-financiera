@@ -92,7 +92,7 @@
             align-items: center;
         }
         .section-title select {
-            padding: 5px 10px;
+            padding: 6px 10px;
             border-radius: 4px;
             border: none;
             font-size: 0.9rem;
@@ -318,9 +318,9 @@
             <tbody>
                 {% if gastos %}
                     {% for gasto in gastos %}
-                    <tr class="fila-gasto" data-periodo="{{ gasto.mes | lower }}">
+                    <tr class="fila-gasto" data-periodo="{{ (gasto.mes or gasto.periodo or '') | lower }}">
                         <td><strong>{{ gasto.concepto }}</strong></td>
-                        <td>{{ gasto.mes }}</td>
+                        <td>{{ gasto.mes or gasto.periodo }}</td>
                         <td>{{ gasto.monto | clp }}</td>
                         <td>
                             <a href="/editar_gasto/{{ gasto.id }}" class="btn-action btn-edit">✏️ Editar</a>
@@ -341,18 +341,18 @@
             <span>📋 Historial de Trabajos y Servicios</span>
             <select id="filtroMesTrabajos" onchange="filtrarTrabajos()">
                 <option value="todos">📅 Todos los meses</option>
-                <option value="2026-01">Enero</option>
-                <option value="2026-02">Febrero</option>
-                <option value="2026-03">Marzo</option>
-                <option value="2026-04">Abril</option>
-                <option value="2026-05">Mayo</option>
-                <option value="2026-06">Junio</option>
-                <option value="2026-07">Julio</option>
-                <option value="2026-08">Agosto</option>
-                <option value="2026-09">Septiembre</option>
-                <option value="2026-10">Octubre</option>
-                <option value="2026-11">Noviembre</option>
-                <option value="2026-12">Diciembre</option>
+                <option value="01">Enero</option>
+                <option value="02">Febrero</option>
+                <option value="03">Marzo</option>
+                <option value="04">Abril</option>
+                <option value="05">Mayo</option>
+                <option value="06">Junio</option>
+                <option value="07">Julio</option>
+                <option value="08">Agosto</option>
+                <option value="09">Septiembre</option>
+                <option value="10">Octubre</option>
+                <option value="11">Noviembre</option>
+                <option value="12">Diciembre</option>
             </select>
         </div>
         <table id="tablaTrabajos">
@@ -419,13 +419,22 @@
     }
 
     function filtrarTrabajos() {
-        let mesSeleccionado = document.getElementById('filtroMesTrabajos').value;
+        let mesSeleccionado = document.getElementById('filtroMesTrabajos').value; // Ej: "03"
         let filas = document.querySelectorAll('.fila-trabajo');
         
         filas.forEach(fila => {
             let fecha = fila.getAttribute('data-fecha'); // Formato YYYY-MM-DD
-            if (mesSeleccionado === 'todos' || (fecha && fecha.startsWith(mesSeleccionado))) {
+            if (mesSeleccionado === 'todos') {
                 fila.style.display = '';
+            } else if (fecha) {
+                // Extraemos el mes de la fecha (por ejemplo, de "2026-03-15" extrae "03")
+                let partes = fecha.split('-');
+                let mesFecha = partes.length >= 2 ? partes[1] : '';
+                if (mesFecha === mesSeleccionado) {
+                    fila.style.display = '';
+                } else {
+                    fila.style.display = 'none';
+                }
             } else {
                 fila.style.display = 'none';
             }
@@ -445,7 +454,7 @@
     const gastosFijos = [
         {% for gasto in gastos %}
             {
-                mes: "{{ gasto.mes }}",
+                mes: "{{ gasto.mes or gasto.periodo }}",
                 monto: {{ gasto.monto or 0 }}
             },
         {% endfor %}
