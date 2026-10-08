@@ -22,43 +22,60 @@ def formato_clp(value):
 
 @app.route('/')
 def index():
-    datos = []
+    datos_trabajos = []
+    datos_gastos = []
     hoy = date.today()
+
+    # 1. Obtener Trabajos
     try:
-        response = supabase.table("trabajos").select("*").execute()
-        if response.data:
-            for item in response.data:
+        resp_trabajos = supabase.table("trabajos").select("*").execute()
+        if resp_trabajos.data:
+            for item in resp_trabajos.data:
                 neto_val = float(item.get('neto') if item.get('neto') is not None else item.get('monto_neto', 0))
                 item['neto'] = neto_val
                 item['monto_neto'] = neto_val
                 item['iva'] = neto_val * 0.19
                 item['total_bruto'] = neto_val * 1.19
                 
-                # Verificamos si han pasado 30 días o menos desde la fecha del trabajo
-                fecha_str = item.get('fecha', '')
+                # Validación de 30 días desde el registro (usando created_at si existe, o fecha como respaldo)
                 editable = False
-                if fecha_str:
+                fecha_ref = item.get('created_at') or item.get('fecha', '')
+                if fecha_ref:
                     try:
-                        f_trabajo = datetime.strptime(fecha_str.split('T')[0], '%Y-%m-%d').date()
-                        dias_transcurridos = (hoy - f_trabajo).days
+                        f_reg = datetime.strptime(fecha_ref.split('T')[0], '%Y-%m-%d').date()
+                        dias_transcurridos = (hoy - f_reg).days
                         if 0 <= dias_transcurridos <= 30:
                             editable = True
                     except Exception:
                         pass
                 item['editable'] = editable
 
-            datos = response.data
+            datos_trabajos = resp_trabajos.data
     except Exception as e:
-        print(f"Error al consultar Supabase: {e}")
+        print(f"Error al consultar trabajos en Supabase: {e}")
 
-    total_ingresos = sum(float(item.get('total_bruto', 0)) for item in datos if str(item.get('estado', '')).lower() in ['pagado', 'completado'])
-    total_pendientes = sum(float(item.get('total_bruto', 0)) for item in datos if str(item.get('estado', '')).lower() not in ['pagado', 'completado'])
-    egresos = sum(float(item.get('gastos_op') or 0) for item in datos)
+    # 2. Obtener Gastos Fijos
+    try:
+        resp_gastos = supabase.table("gastos_fijos").select("*").execute()
+        if resp_gastos.data:
+            datos_gastos = resp_gastos.data
+    except Exception as e:
+        print(f"Error al consultar gastos fijos en Supabase: {e}")
+
+    # Cálculos financieros
+    total_ingresos = sum(float(item.get('total_bruto', 0)) for item in datos_trabajos if str(item.get('estado', '')).lower() in ['pagado', 'completado'])
+    total_pendientes = sum(float(item.get('total_bruto', 0)) for item in datos_trabajos if str(item.get('estado', '')).lower() not in ['pagado', 'completado'])
+    
+    total_gastos_op = sum(float(item.get('gastos_op') or 0) for item in datos_trabajos)
+    total_gastos_fijos = sum(float(item.get('monto') or 0) for item in datos_gastos)
+    egresos = total_gastos_op + total_gastos_fijos
+
     capital_disponible = total_ingresos - egresos
 
     return render_template(
         'index.html',
-        datos=datos,
+        datos=datos_trabajos,
+        gastos=datos_gastos,
         total_ingresos=total_ingresos,
         total_pendientes=total_pendientes,
         por_cobrar=total_pendientes,
