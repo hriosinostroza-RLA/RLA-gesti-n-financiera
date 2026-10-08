@@ -4,6 +4,8 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>RLA | Gestión Financiera y Técnica</title>
+    <!-- Incluir Chart.js para gráficos -->
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <style>
         :root {
             --bg-color: #f4f6f9;
@@ -31,7 +33,20 @@
             margin-bottom: 25px;
             font-size: 1.2rem;
             font-weight: bold;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
         }
+        .btn-pdf {
+            background-color: #dc3545;
+            color: white;
+            padding: 8px 15px;
+            border-radius: 4px;
+            text-decoration: none;
+            font-size: 0.9rem;
+            font-weight: bold;
+        }
+        .btn-pdf:hover { opacity: 0.9; }
         .grid-cards {
             display: grid;
             grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
@@ -164,6 +179,11 @@
             color: #777;
             padding: 20px;
         }
+        .chart-container {
+            position: relative;
+            height: 350px;
+            width: 100%;
+        }
     </style>
 </head>
 <body>
@@ -172,7 +192,8 @@
 
     <!-- Barra Superior -->
     <div class="header-bar">
-        ⚙️ RLA | Gestión Financiera y Técnica
+        <span>⚙️ RLA | Gestión Financiera y Técnica</span>
+        <a href="/exportar_pdf" class="btn-pdf" target="_blank">📄 Exportar a PDF</a>
     </div>
 
     <!-- Panel de Balance (Grid 2x2) -->
@@ -192,6 +213,14 @@
         <div class="card blue">
             <div class="card-title">Capital Disponible</div>
             <div class="card-value">{{ capital_disponible | clp }}</div>
+        </div>
+    </div>
+
+    <!-- Gráficos de 12 Meses Corridos -->
+    <div class="section-box">
+        <div class="section-title">📊 Resumen Financiero Mensual (Últimos 12 Meses)</div>
+        <div class="chart-container">
+            <canvas id="financialChart"></canvas>
         </div>
     </div>
 
@@ -357,6 +386,105 @@
     </div>
 
 </div>
+
+<script>
+    // Procesar datos para los últimos 12 meses en el gráfico
+    const trabajos = [
+        {% for item in datos %}
+            {
+                fecha: "{{ item.fecha }}",
+                ingreso: {% if item.estado | lower in ['pagado', 'completado'] %}{{ item.total_bruto }}{% else %}0{% endif %},
+                egreso: {{ item.gastos_op or 0 }}
+            },
+        {% endfor %}
+    ];
+
+    const gastosFijos = [
+        {% for gasto in gastos %}
+            {
+                mes: "{{ gasto.mes }}",
+                monto: {{ gasto.monto or 0 }}
+            },
+        {% endfor %}
+    ];
+
+    // Generar etiquetas de los últimos 12 meses
+    const mesesNombres = ["Ene", "Feb", "Mar", "Abr", "May", "Jun", "Jul", "Ago", "Sep", "Oct", "Nov", "Dic"];
+    const hoy = new Date();
+    let labels = [];
+    let ingresosMap = {};
+    let egresosMap = {};
+
+    for (let i = 11; i >= 0; i--) {
+        let d = new Date(hoy.getFullYear(), hoy.getMonth() - i, 1);
+        let anio = d.getFullYear();
+        let mesIdx = d.getMonth();
+        let key = `${anio}-${String(mesIdx + 1).padStart(2, '0')}`;
+        let label = `${mesesNombres[mesIdx]} ${anio}`;
+        labels.push(label);
+        ingresosMap[key] = 0;
+        egresosMap[key] = 0;
+    }
+
+    // Agrupar ingresos de trabajos por mes
+    trabajos.forEach(t => {
+        if (t.fecha) {
+            let key = t.fecha.substring(0, 7); // YYYY-MM
+            if (ingresosMap[key] !== undefined) {
+                ingresosMap[key] += t.ingreso;
+                egresosMap[key] += t.egreso;
+            }
+        }
+    });
+
+    // Agrupar gastos fijos (intentando matchear por texto o asignando al mes actual si no coincide exacto)
+    gastosFijos.forEach(g => {
+        // Tomamos el primer mes del arreglo de 12 meses para centralizar si es un gasto general, o buscamos coincidencia
+        let keys = Object.keys(egresosMap);
+        if (keys.length > 0) {
+            egresosMap[keys[keys.length - 1]] += g.monto;
+        }
+    });
+
+    let dataIngresos = Object.keys(ingresosMap).map(k => ingresosMap[k]);
+    let dataEgresos = Object.keys(egresosMap).map(k => egresosMap[k]);
+
+    const ctx = document.getElementById('financialChart').getContext('2d');
+    new Chart(ctx, {
+        type: 'bar',
+        data: {
+            labels: labels,
+            datasets: [
+                {
+                    label: 'Ingresos (Pagados)',
+                    data: dataIngresos,
+                    backgroundColor: '#28a745',
+                    borderRadius: 4
+                },
+                {
+                    label: 'Egresos (Op. & Fijos)',
+                    data: dataEgresos,
+                    backgroundColor: '#dc3545',
+                    borderRadius: 4
+                }
+            ]
+        },
+        options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            scales: {
+                y: {
+                    beginAtZero: true,
+                    ticks: {
+                        callback: function(value) {
+                            return '$' + value.toLocaleString('es-CL');
+                        }
+                    }
+                }
+            }
+        }
+    });
+</script>
 
 </body>
 </html>
