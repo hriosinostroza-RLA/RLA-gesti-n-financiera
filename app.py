@@ -134,7 +134,6 @@ def exportar_pdf():
     elements.append(Paragraph(f"Reporte generado el: {date.today().strftime('%d-%m-%Y')}", normal_style))
     elements.append(Spacer(1, 15))
 
-    # Obtener datos de Supabase para el PDF
     try:
         resp_trabajos = supabase.table("trabajos").select("*").execute()
         datos_trabajos = resp_trabajos.data if resp_trabajos.data else []
@@ -147,7 +146,7 @@ def exportar_pdf():
     except Exception:
         datos_gastos = []
 
-    # Tabla Trabajos
+    # Tabla Trabajos PDF
     elements.append(Paragraph("<b>Historial de Trabajos y Servicios</b>", subtitle_style))
     t_data = [["Factura", "Fecha", "Cliente", "Equipo", "Neto", "Estado"]]
     for item in datos_trabajos:
@@ -173,7 +172,7 @@ def exportar_pdf():
     elements.append(t_table)
     elements.append(Spacer(1, 15))
 
-    # Tabla Gastos Fijos
+    # Tabla Gastos Fijos PDF
     elements.append(Paragraph("<b>Historial de Gastos Fijos</b>", subtitle_style))
     g_data = [["Concepto", "Periodo / Mes", "Monto"]]
     for gasto in datos_gastos:
@@ -220,6 +219,38 @@ def agregar_trabajo():
     
     return redirect(url_for('index'))
 
+@app.route('/editar_trabajo/<int:id>', methods=['GET', 'POST'])
+def editar_trabajo(id):
+    if request.method == 'POST':
+        try:
+            datos_actualizados = {
+                "n_factura": request.form.get('factura', ''),
+                "fecha": request.form.get('fecha', ''),
+                "cliente": request.form.get('cliente', ''),
+                "equipo": request.form.get('equipo', ''),
+                "servicio": request.form.get('servicio', ''),
+                "neto": float(request.form.get('monto_neto') or 0),
+                "gastos_op": float(request.form.get('gastos_op') or 0),
+                "viaticos": float(request.form.get('viaticos') or 0),
+                "estado": request.form.get('estado', 'Pendiente')
+            }
+            supabase.table("trabajos").update(datos_actualizados).eq("id", id).execute()
+        except Exception as e:
+            print(f"Error al actualizar trabajo: {e}")
+        return redirect(url_for('index'))
+    
+    try:
+        resp = supabase.table("trabajos").select("*").eq("id", id).execute()
+        trabajo = resp.data[0] if resp.data else None
+        if trabajo:
+            neto_val = trabajo.get('neto') if trabajo.get('neto') is not None else trabajo.get('monto_neto', 0)
+            trabajo['monto_neto'] = neto_val
+    except Exception as e:
+        print(f"Error al obtener trabajo para editar: {e}")
+        trabajo = None
+
+    return render_template('editar_trabajo.html', trabajo=trabajo)
+
 @app.route('/marcar_pagado/<int:id>', methods=['POST'])
 def marcar_pagado(id):
     try:
@@ -243,6 +274,31 @@ def agregar_gasto():
         print(f"Error al guardar el gasto fijo en Supabase: {e}")
     
     return redirect(url_for('index'))
+
+@app.route('/editar_gasto/<int:id>', methods=['GET', 'POST'])
+def editar_gasto(id):
+    if request.method == 'POST':
+        try:
+            datos_actualizados = {
+                "concepto": request.form.get('concepto', ''),
+                "monto": float(request.form.get('monto') or 0),
+                "mes": request.form.get('periodo', '')
+            }
+            supabase.table("gastos_fijos").update(datos_actualizados).eq("id", id).execute()
+        except Exception as e:
+            print(f"Error al actualizar gasto fijo: {e}")
+        return redirect(url_for('index'))
+    
+    try:
+        resp = supabase.table("gastos_fijos").select("*").eq("id", id).execute()
+        gasto = resp.data[0] if resp.data else None
+        if gasto:
+            gasto['periodo'] = gasto.get('mes') or gasto.get('periodo', '')
+    except Exception as e:
+        print(f"Error al obtener gasto fijo para editar: {e}")
+        gasto = None
+
+    return render_template('editar_gasto.html', gasto=gasto)
 
 if __name__ == '__main__':
     port = int(os.environ.get("PORT", 5000))
