@@ -2,65 +2,507 @@
 <html lang="es">
 <head>
     <meta charset="UTF-8">
-    <title>Editar Trabajo | RLA</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>RLA | Gestión Financiera y Técnica</title>
+    <!-- Incluir Chart.js para gráficos -->
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <style>
-        body { font-family: Arial, sans-serif; background-color: #f4f6f9; padding: 30px; }
-        .container { max-width: 600px; margin: 0 auto; background: #fff; padding: 25px; border-radius: 8px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); }
-        h2 { background: #22252a; color: white; padding: 12px 15px; margin: -25px -25px 20px -25px; border-radius: 6px 6px 0 0; }
-        .form-group { display: flex; flex-direction: column; margin-bottom: 15px; }
-        .form-group label { font-size: 0.85rem; font-weight: bold; margin-bottom: 5px; color: #444; }
-        .form-group input, .form-group select { padding: 10px; border: 1px solid #dcdcdc; border-radius: 4px; font-size: 0.95rem; }
-        .btn-submit { background-color: #17a2b8; color: white; border: none; padding: 12px; font-weight: bold; border-radius: 4px; cursor: pointer; width: 100%; margin-top: 10px; }
-        .btn-submit:hover { opacity: 0.9; }
-        .btn-back { display: block; text-align: center; margin-top: 15px; color: #666; text-decoration: none; font-size: 0.9rem; }
+        :root {
+            --bg-color: #f4f6f9;
+            --card-bg: #ffffff;
+            --text-color: #333333;
+            --border-color: #dcdcdc;
+            --primary-dark: #22252a;
+        }
+        body {
+            font-family: Arial, sans-serif;
+            background-color: var(--bg-color);
+            color: var(--text-color);
+            margin: 0;
+            padding: 20px;
+        }
+        .container {
+            max-width: 1250px;
+            margin: 0 auto;
+        }
+        .header-bar {
+            background-color: var(--primary-dark);
+            color: #ffffff;
+            padding: 15px 20px;
+            border-radius: 6px;
+            margin-bottom: 25px;
+            font-size: 1.2rem;
+            font-weight: bold;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+        .btn-pdf {
+            background-color: #dc3545;
+            color: white;
+            padding: 8px 15px;
+            border-radius: 4px;
+            text-decoration: none;
+            font-size: 0.9rem;
+            font-weight: bold;
+        }
+        .btn-pdf:hover { opacity: 0.9; }
+        .grid-cards {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+            gap: 20px;
+            margin-bottom: 30px;
+        }
+        .card {
+            background-color: var(--card-bg);
+            padding: 20px;
+            border-radius: 8px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.05);
+            border-left: 5px solid #ccc;
+        }
+        .card.green { border-left-color: #28a745; }
+        .card.yellow { border-left-color: #ffc107; }
+        .card.red { border-left-color: #dc3545; }
+        .card.blue { border-left-color: #007bff; }
+        .card-title {
+            font-size: 0.9rem;
+            color: #666;
+            margin-bottom: 8px;
+        }
+        .card-value {
+            font-size: 1.8rem;
+            font-weight: bold;
+            color: #111;
+        }
+        .section-box {
+            background-color: var(--card-bg);
+            padding: 25px;
+            border-radius: 8px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.05);
+            margin-bottom: 30px;
+        }
+        .section-title {
+            background-color: var(--primary-dark);
+            color: white;
+            padding: 12px 15px;
+            border-radius: 6px;
+            font-size: 1rem;
+            margin: -25px -25px 20px -25px;
+        }
+        .form-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+            gap: 15px;
+            margin-bottom: 15px;
+        }
+        .form-group {
+            display: flex;
+            flex-direction: column;
+        }
+        .form-group label {
+            font-size: 0.85rem;
+            margin-bottom: 5px;
+            color: #444;
+            font-weight: bold;
+        }
+        .form-group input, .form-group select {
+            padding: 10px;
+            border: 1px solid var(--border-color);
+            border-radius: 4px;
+            font-size: 0.95rem;
+        }
+        input[type=number]::-webkit-inner-spin-button, 
+        input[type=number]::-webkit-outer-spin-button { 
+            -webkit-appearance: none; 
+            margin: 0; 
+        }
+        input[type=number] {
+            -moz-appearance: textfield;
+        }
+        .btn-submit {
+            background-color: #ffc107;
+            color: #111;
+            border: none;
+            padding: 12px 20px;
+            font-weight: bold;
+            border-radius: 4px;
+            cursor: pointer;
+            width: 100%;
+            margin-top: 10px;
+            font-size: 1rem;
+        }
+        .btn-submit.red-btn {
+            background-color: #dc3545;
+            color: white;
+        }
+        .btn-submit:hover {
+            opacity: 0.9;
+        }
+        .btn-action {
+            padding: 6px 10px;
+            font-size: 0.8rem;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            font-weight: bold;
+            text-decoration: none;
+            display: inline-block;
+            margin-right: 4px;
+        }
+        .btn-pay {
+            background-color: #28a745;
+            color: white;
+        }
+        .btn-pay:hover { background-color: #218838; }
+        .btn-edit {
+            background-color: #17a2b8;
+            color: white;
+        }
+        .btn-edit:hover { background-color: #138496; }
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-top: 10px;
+        }
+        th, td {
+            padding: 12px;
+            text-align: left;
+            border-bottom: 1px solid var(--border-color);
+            font-size: 0.9rem;
+        }
+        th {
+            background-color: var(--primary-dark);
+            color: white;
+        }
+        .empty-table {
+            text-align: center;
+            color: #777;
+            padding: 20px;
+        }
+        .chart-container {
+            position: relative;
+            height: 350px;
+            width: 100%;
+        }
     </style>
 </head>
 <body>
+
 <div class="container">
-    <h2>✏️ Editar Trabajo / Servicio Técnico</h2>
-    <form method="POST">
-        <div class="form-group">
-            <label>N° Factura / Orden</label>
-            <input type="text" name="factura" value="{{ trabajo.n_factura }}" required>
+
+    <!-- Barra Superior -->
+    <div class="header-bar">
+        <span>⚙️ RLA | Gestión Financiera y Técnica</span>
+        <a href="/exportar_pdf" class="btn-pdf" target="_blank">📄 Exportar a PDF</a>
+    </div>
+
+    <!-- Panel de Balance (Grid 2x2) -->
+    <div class="grid-cards">
+        <div class="card green">
+            <div class="card-title">Ingresos (Pagados con IVA)</div>
+            <div class="card-value">{{ total_ingresos | clp }}</div>
         </div>
-        <div class="form-group">
-            <label>Fecha</label>
-            <input type="date" name="fecha" value="{{ trabajo.fecha }}" required>
+        <div class="card yellow">
+            <div class="card-title">Por Cobrar (Pendientes)</div>
+            <div class="card-value">{{ total_pendientes | clp }}</div>
         </div>
-        <div class="form-group">
-            <label>Cliente</label>
-            <input type="text" name="cliente" value="{{ trabajo.cliente }}" required>
+        <div class="card red">
+            <div class="card-title">Egresos Op. & Fijos</div>
+            <div class="card-value">{{ total_egresos | clp }}</div>
         </div>
-        <div class="form-group">
-            <label>Equipo</label>
-            <input type="text" name="equipo" value="{{ trabajo.equipo }}" required>
+        <div class="card blue">
+            <div class="card-title">Capital Disponible</div>
+            <div class="card-value">{{ capital_disponible | clp }}</div>
         </div>
-        <div class="form-group">
-            <label>Servicio Realizado</label>
-            <input type="text" name="servicio" value="{{ trabajo.servicio }}" required>
+    </div>
+
+    <!-- Gráficos de 12 Meses (Enero a Diciembre 2026) -->
+    <div class="section-box">
+        <div class="section-title">📊 Resumen Financiero Mensual (Enero - Diciembre 2026)</div>
+        <div class="chart-container">
+            <canvas id="financialChart"></canvas>
         </div>
-        <div class="form-group">
-            <label>Monto Neto ($)</label>
-            <input type="number" step="any" name="monto_neto" value="{{ trabajo.monto_neto }}" required>
-        </div>
-        <div class="form-group">
-            <label>Gastos Op.</label>
-            <input type="number" step="any" name="gastos_op" value="{{ trabajo.gastos_op }}">
-        </div>
-        <div class="form-group">
-            <label>Viáticos</label>
-            <input type="number" step="any" name="viaticos" value="{{ trabajo.viaticos }}">
-        </div>
-        <div class="form-group">
-            <label>Estado</label>
-            <select name="estado">
-                <option value="Pendiente" {% if trabajo.estado == 'Pendiente' %}selected{% endif %}>Pendiente</option>
-                <option value="Pagado" {% if trabajo.estado == 'Pagado' %}selected{% endif %}>Pagado</option>
-            </select>
-        </div>
-        <button type="submit" class="btn-submit">💾 Guardar Cambios</button>
-    </form>
-    <a href="/" class="btn-back">← Volver al inicio</a>
+    </div>
+
+    <!-- Formulario: Nuevo Trabajo / Servicio Técnico -->
+    <div class="section-box">
+        <div class="section-title">📄 Nuevo Trabajo / Servicio Técnico</div>
+        <form action="/agregar_trabajo" method="POST">
+            <div class="form-grid">
+                <div class="form-group">
+                    <label>N° Factura / Orden</label>
+                    <input type="text" name="factura" placeholder="Ej. 1002" required>
+                </div>
+                <div class="form-group">
+                    <label>Fecha</label>
+                    <input type="date" name="fecha" required>
+                </div>
+                <div class="form-group">
+                    <label>Cliente</label>
+                    <input type="text" name="cliente" placeholder="Ej. Panadería San José" required>
+                </div>
+            </div>
+            <div class="form-grid">
+                <div class="form-group">
+                    <label>Equipo</label>
+                    <input type="text" name="equipo" placeholder="Ej. Horno Rotativo, Amasadora" required>
+                </div>
+                <div class="form-group">
+                    <label>Servicio Realizado</label>
+                    <input type="text" name="servicio" placeholder="Mantención preventiva / rodamientos" required>
+                </div>
+            </div>
+            <div class="form-grid">
+                <div class="form-group">
+                    <label>Monto Neto ($)</label>
+                    <input type="number" step="any" name="monto_neto" placeholder="0" required>
+                </div>
+                <div class="form-group">
+                    <label>Gastos Op.</label>
+                    <input type="number" step="any" name="gastos_op" value="0">
+                </div>
+                <div class="form-group">
+                    <label>Viáticos</label>
+                    <input type="number" step="any" name="viaticos" value="0">
+                </div>
+                <div class="form-group">
+                    <label>Estado</label>
+                    <select name="estado">
+                        <option value="Pendiente">Pendiente</option>
+                        <option value="Pagado">Pagado</option>
+                    </select>
+                </div>
+            </div>
+            <button type="submit" class="btn-submit">💾 Guardar Trabajo</button>
+        </form>
+    </div>
+
+    <!-- Formulario: Registro de Gasto Fijo Mensual -->
+    <div class="section-box">
+        <div class="section-title">📉 Registro de Gasto Fijo Mensual</div>
+        <form action="/agregar_gasto" method="POST">
+            <div class="form-grid">
+                <div class="form-group">
+                    <label>Concepto del Gasto Fijo</label>
+                    <input type="text" name="concepto" placeholder="Ej. Arriendo Taller, Internet" required>
+                </div>
+                <div class="form-group">
+                    <label>Monto ($)</label>
+                    <input type="number" step="any" name="monto" placeholder="0" required>
+                </div>
+                <div class="form-group">
+                    <label>Mes / Periodo</label>
+                    <input type="text" name="periodo" placeholder="Ej. Enero 2026" required>
+                </div>
+            </div>
+            <button type="submit" class="btn-submit red-btn">📉 Registrar Gasto Fijo</button>
+        </form>
+    </div>
+
+    <!-- Historial de Gastos Fijos -->
+    <div class="section-box">
+        <div class="section-title">📋 Historial de Gastos Fijos</div>
+        <table>
+            <thead>
+                <tr>
+                    <th>Concepto</th>
+                    <th>Periodo</th>
+                    <th>Monto</th>
+                    <th>Acciones</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% if gastos %}
+                    {% for gasto in gastos %}
+                    <tr>
+                        <td><strong>{{ gasto.concepto }}</strong></td>
+                        <td>{{ gasto.mes }}</td>
+                        <td>{{ gasto.monto | clp }}</td>
+                        <td>
+                            {% if gasto.editable %}
+                                <a href="#" class="btn-action btn-edit" title="Disponible por 10 días desde el registro">✏️ Editar</a>
+                            {% endif %}
+                        </td>
+                    </tr>
+                    {% endfor %}
+                {% else %}
+                    <tr>
+                        <td colspan="4" class="empty-table">No hay gastos fijos registrados todavía.</td>
+                    </tr>
+                {% endif %}
+            </tbody>
+        </table>
+    </div>
+
+    <!-- Historial de Trabajos y Servicios -->
+    <div class="section-box">
+        <div class="section-title">📋 Historial de Trabajos y Servicios</div>
+        <table>
+            <thead>
+                <tr>
+                    <th>N° Factura</th>
+                    <th>Fecha</th>
+                    <th>Cliente</th>
+                    <th>Equipo / Servicio</th>
+                    <th>Neto</th>
+                    <th>IVA (19%)</th>
+                    <th>Total Bruto</th>
+                    <th>Estado</th>
+                    <th>Acciones</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% if datos %}
+                    {% for item in datos %}
+                    <tr>
+                        <td><strong>{{ item.n_factura }}</strong></td>
+                        <td>{{ item.fecha }}</td>
+                        <td>{{ item.cliente }}</td>
+                        <td><strong>{{ item.equipo }}</strong>: {{ item.servicio }}</td>
+                        <td>{{ item.neto | clp }}</td>
+                        <td>{{ item.iva | clp }}</td>
+                        <td><strong>{{ item.total_bruto | clp }}</strong></td>
+                        <td>{{ item.estado }}</td>
+                        <td>
+                            {% if item.estado != 'Pagado' and item.estado != 'Completado' %}
+                                <form action="/marcar_pagado/{{ item.id }}" method="POST" style="display:inline;">
+                                    <button type="submit" class="btn-action btn-pay" title="Marcar como Pagado">💰 Pagar</button>
+                                </form>
+                            {% endif %}
+                            
+                            {% if item.editable %}
+                                <a href="#" class="btn-action btn-edit" title="Disponible por 10 días desde el registro">✏️ Editar</a>
+                            {% endif %}
+                        </td>
+                    </tr>
+                    {% endfor %}
+                {% else %}
+                    <tr>
+                        <td colspan="9" class="empty-table">No hay trabajos registrados todavía.</td>
+                    </tr>
+                {% endif %}
+            </tbody>
+        </table>
+    </div>
+
 </div>
+
+<script>
+    // Procesar datos de trabajos y gastos fijos
+    const trabajos = [
+        {% for item in datos %}
+            {
+                fecha: "{{ item.fecha }}",
+                ingreso: {% if item.estado | lower in ['pagado', 'completado'] %}{{ item.total_bruto }}{% else %}0{% endif %},
+                egreso: {{ item.gastos_op or 0 }}
+            },
+        {% endfor %}
+    ];
+
+    const gastosFijos = [
+        {% for gasto in gastos %}
+            {
+                mes: "{{ gasto.mes }}",
+                monto: {{ gasto.monto or 0 }}
+            },
+        {% endfor %}
+    ];
+
+    // Definir los 12 meses fijos del año 2026 (Enero a Diciembre)
+    const mesesNombres = ["Ene", "Feb", "Mar", "Abr", "May", "Jun", "Jul", "Ago", "Sep", "Oct", "Nov", "Dic"];
+    let labels = [];
+    let ingresosMap = {};
+    let egresosMap = {};
+
+    for (let m = 0; m < 12; m++) {
+        let anio = 2026;
+        let key = `${anio}-${String(m + 1).padStart(2, '0')}`;
+        let label = `${mesesNombres[m]} ${anio}`;
+        labels.push(label);
+        ingresosMap[key] = 0;
+        egresosMap[key] = 0;
+    }
+
+    // Agrupar ingresos y gastos operativos de los trabajos por mes (año 2026)
+    trabajos.forEach(t => {
+        if (t.fecha && t.fecha.startsWith("2026")) {
+            let key = t.fecha.substring(0, 7); // YYYY-MM
+            if (ingresosMap[key] !== undefined) {
+                ingresosMap[key] += t.ingreso;
+                egresosMap[key] += t.egreso;
+            }
+        }
+    });
+
+    // Mapeo inteligente para los gastos fijos según el texto del mes registrado
+    const mapMesTexto = {
+        "enero": "2026-01", "january": "2026-01",
+        "febrero": "2026-02", "february": "2026-02",
+        "marzo": "2026-03", "march": "2026-03",
+        "abril": "2026-04", "april": "2026-04",
+        "mayo": "2026-05", "may": "2026-05",
+        "junio": "2026-06", "june": "2026-06",
+        "julio": "2026-07", "july": "2026-07",
+        "agosto": "2026-08", "august": "2026-08",
+        "septiembre": "2026-09", "september": "2026-09",
+        "octubre": "2026-10", "october": "2026-10",
+        "noviembre": "2026-11", "november": "2026-11",
+        "diciembre": "2026-12", "december": "2026-12"
+    };
+
+    gastosFijos.forEach(g => {
+        let textoMes = (g.mes || "").toLowerCase();
+        let encontradoKey = null;
+        for (let [nombre, keyVal] of Object.entries(mapMesTexto)) {
+            if (textoMes.includes(nombre)) {
+                encontradoKey = keyVal;
+                break;
+            }
+        }
+        if (encontradoKey && egresosMap[encontradoKey] !== undefined) {
+            egresosMap[encontradoKey] += g.monto;
+        }
+    });
+
+    let dataIngresos = Object.keys(ingresosMap).map(k => ingresosMap[k]);
+    let dataEgresos = Object.keys(egresosMap).map(k => egresosMap[k]);
+
+    const ctx = document.getElementById('financialChart').getContext('2d');
+    new Chart(ctx, {
+        type: 'bar',
+        data: {
+            labels: labels,
+            datasets: [
+                {
+                    label: 'Ingresos (Pagados)',
+                    data: dataIngresos,
+                    backgroundColor: '#28a745',
+                    borderRadius: 4
+                },
+                {
+                    label: 'Egresos (Op. & Fijos)',
+                    data: dataEgresos,
+                    backgroundColor: '#dc3545',
+                    borderRadius: 4
+                }
+            ]
+        },
+        options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            scales: {
+                y: {
+                    beginAtZero: true,
+                    ticks: {
+                        callback: function(value) {
+                            return '$' + value.toLocaleString('es-CL');
+                        }
+                    }
+                }
+            }
+        }
+    });
+</script>
+
 </body>
 </html>
