@@ -230,9 +230,10 @@ def agregar_gasto():
             "mes": periodo_val,
             "created_at": datetime.now().isoformat()
         }
+        print(f"Insertando gasto fijo en Supabase: {nuevo_gasto}")
         supabase.table("gastos_fijos").insert(nuevo_gasto).execute()
     except Exception as e:
-        print(f"Error al guardar el gasto fijo en Supabase: {e}")
+        print(f"❌ Error al guardar el gasto fijo en Supabase: {e}")
     
     return redirect(url_for('index'))
 
