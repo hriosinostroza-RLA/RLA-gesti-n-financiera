@@ -87,6 +87,9 @@
             border-radius: 6px;
             font-size: 1rem;
             margin: -25px -25px 20px -25px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
         }
         .form-grid {
             display: grid;
@@ -143,12 +146,24 @@
         .btn-edit { background-color: #17a2b8; color: white; }
         .btn-edit:hover { background-color: #138496; }
         
-        /* Estilos para los Acordeones de Meses */
+        .btn-control {
+            background-color: #495057;
+            color: white;
+            border: none;
+            padding: 5px 10px;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 0.8rem;
+            font-weight: normal;
+            margin-left: 5px;
+        }
+        .btn-control:hover { background-color: #343a40; }
+
         details.mes-acordeon {
             background: #f8f9fa;
             border: 1px solid var(--border-color);
             border-radius: 6px;
-            margin-bottom: 10px;
+            margin-bottom: 12px;
             overflow: hidden;
         }
         details.mes-acordeon summary {
@@ -226,14 +241,14 @@
     </div>
 
     <div class="section-box">
-        <div class="section-title">📊 Resumen Financiero Mensual (Enero - Diciembre 2026)</div>
+        <div class="section-title"><span>📊 Resumen Financiero Mensual (Enero - Diciembre 2026)</span></div>
         <div class="chart-container">
             <canvas id="financialChart"></canvas>
         </div>
     </div>
 
     <div class="section-box">
-        <div class="section-title">📄 Nuevo Trabajo / Servicio Técnico</div>
+        <div class="section-title"><span>📄 Nuevo Trabajo / Servicio Técnico</span></div>
         <form action="/agregar_trabajo" method="POST">
             <div class="form-grid">
                 <div class="form-group">
@@ -285,7 +300,7 @@
     </div>
 
     <div class="section-box">
-        <div class="section-title">📉 Registro de Gasto Fijo Mensual</div>
+        <div class="section-title"><span>📉 Registro de Gasto Fijo Mensual</span></div>
         <form action="/agregar_gasto" method="POST">
             <div class="form-grid">
                 <div class="form-group">
@@ -306,19 +321,25 @@
     </div>
 
     <div class="section-box">
-        <div class="section-title">📋 Historial de Gastos Fijos (Agrupado por Mes)</div>
+        <div class="section-title">
+            <span>📋 Historial de Gastos Fijos</span>
+            <div>
+                <button type="button" class="btn-control" onclick="toggleAcordeones('gastos', true)">📂 Abrir Todos</button>
+                <button type="button" class="btn-control" onclick="toggleAcordeones('gastos', false)">📁 Cerrar Todos</button>
+            </div>
+        </div>
         {% if gastos %}
-            {% set gastos_por_mes = {} %}
+            {% set ns = namespace(gastos_mes={}) %}
             {% for g in gastos %}
-                {% set mes_key = (g.mes or g.periodo or 'Sin Especificar') | title %}
-                {% if mes_key not in gastos_por_mes %}
-                    {% set _ = gastos_por_mes.update({mes_key: []}) %}
+                {% set periodo_bruto = (g.mes or g.periodo or 'Sin Especificar') | trim | title %}
+                {% if periodo_bruto not in ns.gastos_mes %}
+                    {% set _ = ns.gastos_mes.update({periodo_bruto: []}) %}
                 {% endif %}
-                {% set _ = gastos_por_mes[mes_key].append(g) %}
+                {% set _ = ns.gastos_mes[periodo_bruto].append(g) %}
             {% endfor %}
 
-            {% for mes, lista_g in gastos_por_mes.items() %}
-            <details class="mes-acordeon">
+            {% for mes, lista_g in ns.gastos_mes.items() %}
+            <details class="mes-acordeon gasto-acordeon">
                 <summary>
                     <span>📅 {{ mes }}</span>
                     <span style="font-size: 0.85rem; color: #555;">({{ lista_g | length }} registros)</span>
@@ -355,9 +376,15 @@
     </div>
 
     <div class="section-box">
-        <div class="section-title">📋 Historial de Trabajos y Servicios (Agrupado por Mes)</div>
+        <div class="section-title">
+            <span>📋 Historial de Trabajos y Servicios</span>
+            <div>
+                <button type="button" class="btn-control" onclick="toggleAcordeones('trabajos', true)">📂 Abrir Todos</button>
+                <button type="button" class="btn-control" onclick="toggleAcordeones('trabajos', false)">📁 Cerrar Todos</button>
+            </div>
+        </div>
         {% if datos %}
-            {% set trabajos_por_mes = {} %}
+            {% set ns_t = namespace(trabajos_mes={}) %}
             {% set nombres_meses = {'01':'Enero', '02':'Febrero', '03':'Marzo', '04':'Abril', '05':'Mayo', '06':'Junio', '07':'Julio', '08':'Agosto', '09':'Septiembre', '10':'Octubre', '11':'Noviembre', '12':'Diciembre'} %}
             
             {% for item in datos %}
@@ -366,17 +393,17 @@
                 {% set anio_mes = partes_fecha[0] if partes_fecha | length >= 1 else '2026' %}
                 {% set nombre_mes_str = nombres_meses.get(num_mes, 'Otro') + ' ' + anio_mes %}
                 
-                {% if nombre_mes_str not in trabajos_por_mes %}
-                    {% set _ = trabajos_por_mes.update({nombre_mes_str: []}) %}
+                {% if nombre_mes_str not in ns_t.trabajos_mes %}
+                    {% set _ = ns_t.trabajos_mes.update({nombre_mes_str: []}) %}
                 {% endif %}
-                {% set _ = trabajos_por_mes[nombre_mes_str].append(item) %}
+                {% set _ = ns_t.trabajos_mes[nombre_mes_str].append(item) %}
             {% endfor %}
 
-            {% for mes, lista_t in trabajos_por_mes.items() %}
-            <details class="mes-acordeon">
+            {% for mes, lista_t in ns_t.trabajos_mes.items() %}
+            <details class="mes-acordeon trabajo-acordeon">
                 <summary>
                     <span>📅 {{ mes }}</span>
-                    <span style="font-size: 0.85rem; color: #555;">({{ lista_t | length }} trabajos)</span>
+                    <span style="font-size: 0.85rem; color: #555;">({{ lista_t | length }} facturas/trabajos)</span>
                 </summary>
                 <div class="contenido-acordeon">
                     <table>
@@ -428,6 +455,19 @@
 </div>
 
 <script>
+    // Función para abrir o cerrar todos los acordeones a la vez
+    function toggleAcordeones(tipo, abrir) {
+        let selector = tipo === 'gastos' ? '.gasto-acordeon' : '.trabajo-acordeon';
+        let acordeones = document.querySelectorAll(selector);
+        acordeones.forEach(acc => {
+            if (abrir) {
+                acc.setAttribute('open', 'true');
+            } else {
+                acc.removeAttribute('open');
+            }
+        });
+    }
+
     const trabajos = [
         {% for item in datos %}
             {
@@ -487,7 +527,7 @@
     };
 
     gastosFijos.forEach(g => {
-        let textoMes = (g.mes || "").toLowerCase();
+        let textoMes = (g.mes || g.periodo || "").toLowerCase();
         let encontradoKey = null;
         for (let [nombre, keyVal] of Object.entries(mapMesTexto)) {
             if (textoMes.includes(nombre)) {
