@@ -263,7 +263,7 @@
                 </div>
                 <div class="form-group">
                     <label>Mes / Periodo</label>
-                    <input type="text" name="periodo" placeholder="Ej. Octubre 2026" required>
+                    <input type="text" name="periodo" placeholder="Ej. Enero 2026" required>
                 </div>
             </div>
             <button type="submit" class="btn-submit red-btn">📉 Registrar Gasto Fijo</button>
@@ -286,7 +286,7 @@
                     {% for gasto in gastos %}
                     <tr>
                         <td><strong>{{ gasto.concepto }}</strong></td>
-                        <td>{{ gasto.periodo }}</td>
+                        <td>{{ gasto.mes }}</td>
                         <td>{{ gasto.monto | clp }}</td>
                     </tr>
                     {% endfor %}
