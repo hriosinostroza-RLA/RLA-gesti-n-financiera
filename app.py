@@ -37,7 +37,6 @@ def index():
                 item['iva'] = neto_val * 0.19
                 item['total_bruto'] = neto_val * 1.19
                 
-                # Validación de 30 días desde el registro (usando created_at si existe, o fecha como respaldo)
                 editable = False
                 fecha_ref = item.get('created_at') or item.get('fecha', '')
                 if fecha_ref:
@@ -58,6 +57,10 @@ def index():
     try:
         resp_gastos = supabase.table("gastos_fijos").select("*").execute()
         if resp_gastos.data:
+            for item in resp_gastos.data:
+                mes_val = item.get('mes') if item.get('mes') is not None else item.get('periodo', '')
+                item['mes'] = mes_val
+                item['periodo'] = mes_val
             datos_gastos = resp_gastos.data
     except Exception as e:
         print(f"Error al consultar gastos fijos en Supabase: {e}")
