@@ -26,7 +26,7 @@ def index():
     datos_gastos = []
     hoy = date.today()
 
-    # 1. Obtener Trabajos (Plazo de edición: 10 días)
+    # 1. Obtener Trabajos
     try:
         resp_trabajos = supabase.table("trabajos").select("*").execute()
         if resp_trabajos.data:
@@ -38,32 +38,7 @@ def index():
                 item['total_bruto'] = neto_val * 1.19
                 
                 editable = False
-                fecha_ref = item.get('created_at') or item.get('fecha', '')
-                if fecha_ref:
-                    try:
-                        f_reg = datetime.strptime(fecha_ref.split('T')[0], '%Y-%m-%d').date()
-                        dias_transcurridos = (hoy - f_reg).days
-                        if 0 <= dias_transcurridos <= 10:
-                            editable = True
-                    except Exception:
-                        pass
-                item['editable'] = editable
-
-            datos_trabajos = resp_trabajos.data
-    except Exception as e:
-        print(f"Error al consultar trabajos en Supabase: {e}")
-
-    # 2. Obtener Gastos Fijos (Plazo de edición: 10 días)
-    try:
-        resp_gastos = supabase.table("gastos_fijos").select("*").execute()
-        if resp_gastos.data:
-            for item in resp_gastos.data:
-                mes_val = item.get('mes') if item.get('mes') is not None else item.get('periodo', '')
-                item['mes'] = mes_val
-                item['periodo'] = mes_val
-                
-                editable = False
-                fecha_ref = item.get('created_at', '')
+                fecha_ref = item.get('created_at')
                 if fecha_ref:
                     try:
                         f_reg = datetime.strptime(fecha_ref.split('T')[0], '%Y-%m-%d').date()
@@ -73,7 +48,33 @@ def index():
                     except Exception:
                         pass
                 else:
-                    # Si no tiene created_at registrado, permitimos editar por defecto o ajustamos
+                    editable = True  # Respaldo para registros antiguos sin created_at
+                item['editable'] = editable
+
+            datos_trabajos = resp_trabajos.data
+    except Exception as e:
+        print(f"Error al consultar trabajos en Supabase: {e}")
+
+    # 2. Obtener Gastos Fijos
+    try:
+        resp_gastos = supabase.table("gastos_fijos").select("*").execute()
+        if resp_gastos.data:
+            for item in resp_gastos.data:
+                mes_val = item.get('mes') if item.get('mes') is not None else item.get('periodo', '')
+                item['mes'] = mes_val
+                item['periodo'] = mes_val
+                
+                editable = False
+                fecha_ref = item.get('created_at')
+                if fecha_ref:
+                    try:
+                        f_reg = datetime.strptime(fecha_ref.split('T')[0], '%Y-%m-%d').date()
+                        dias_transcurridos = (hoy - f_reg).days
+                        if 0 <= dias_transcurridos <= 10:
+                            editable = True
+                    except Exception:
+                        pass
+                else:
                     editable = True
                 item['editable'] = editable
 
@@ -81,7 +82,6 @@ def index():
     except Exception as e:
         print(f"Error al consultar gastos fijos en Supabase: {e}")
 
-    # Cálculos financieros
     total_ingresos = sum(float(item.get('total_bruto', 0)) for item in datos_trabajos if str(item.get('estado', '')).lower() in ['pagado', 'completado'])
     total_pendientes = sum(float(item.get('total_bruto', 0)) for item in datos_trabajos if str(item.get('estado', '')).lower() not in ['pagado', 'completado'])
     
