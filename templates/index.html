@@ -345,16 +345,17 @@
                 {% set clave_orden = num_orden + '_' + periodo_bruto %}
                 
                 {% if clave_orden not in ns.gastos_mes %}
-                    {% set _ = ns.gastos_mes.update({clave_orden: {'nombre': periodo_bruto, 'items': []}}) %}
+                    {% set _ = ns.gastos_mes.update({clave_orden: {'nombre': periodo_bruto, 'registros': []}}) %}
                 {% endif %}
-                {% set _ = ns.gastos_mes[clave_orden]['items'].append(g) %}
+                {% set _ = ns.gastos_mes[clave_orden]['registros'].append(g) %}
             {% endfor %}
 
-            {% for clave, grupo in ns.gastos_mes.items() | sort %}
+            {% for clave in ns.gastos_mes.keys() | sort %}
+            {% set grupo = ns.gastos_mes[clave] %}
             <details class="mes-acordeon gasto-acordeon">
                 <summary>
                     <span>📅 {{ grupo.nombre }}</span>
-                    <span style="font-size: 0.85rem; color: #555;">({{ grupo.items | length }} registros)</span>
+                    <span style="font-size: 0.85rem; color: #555;">({{ grupo.registros | length }} registros)</span>
                 </summary>
                 <div class="contenido-acordeon">
                     <table>
@@ -367,7 +368,7 @@
                             </tr>
                         </thead>
                         <tbody>
-                            {% for gasto in grupo.items %}
+                            {% for gasto in grupo.registros %}
                             <tr>
                                 <td><strong>{{ gasto.concepto }}</strong></td>
                                 <td>{{ gasto.mes or gasto.periodo }}</td>
@@ -408,16 +409,17 @@
                 {% set nombre_mes_str = nombres_meses.get(num_mes, 'Otro') + ' ' + anio_mes %}
                 
                 {% if clave_orden not in ns_t.trabajos_mes %}
-                    {% set _ = ns_t.trabajos_mes.update({clave_orden: {'nombre': nombre_mes_str, 'items': []}}) %}
+                    {% set _ = ns_t.trabajos_mes.update({clave_orden: {'nombre': nombre_mes_str, 'registros': []}}) %}
                 {% endif %}
-                {% set _ = ns_t.trabajos_mes[clave_orden]['items'].append(item) %}
+                {% set _ = ns_t.trabajos_mes[clave_orden]['registros'].append(item) %}
             {% endfor %}
 
-            {% for clave, grupo in ns_t.trabajos_mes.items() | sort %}
+            {% for clave in ns_t.trabajos_mes.keys() | sort %}
+            {% set grupo = ns_t.trabajos_mes[clave] %}
             <details class="mes-acordeon trabajo-acordeon">
                 <summary>
                     <span>📅 {{ grupo.nombre }}</span>
-                    <span style="font-size: 0.85rem; color: #555;">({{ grupo.items | length }} facturas/trabajos)</span>
+                    <span style="font-size: 0.85rem; color: #555;">({{ grupo.registros | length }} facturas/trabajos)</span>
                 </summary>
                 <div class="contenido-acordeon">
                     <table>
@@ -435,7 +437,7 @@
                             </tr>
                         </thead>
                         <tbody>
-                            {% for item in grupo.items %}
+                            {% for item in grupo.registros %}
                             <tr>
                                 <td><strong>{{ item.n_factura }}</strong></td>
                                 <td>{{ item.fecha }}</td>
