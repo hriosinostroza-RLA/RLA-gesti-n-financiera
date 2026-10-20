@@ -32,8 +32,9 @@ def index():
     datos_trabajos = []
     datos_gastos = []
 
+    # 1. Obtener Trabajos desde Supabase ordenados por fecha
     try:
-        resp_trabajos = supabase.table("trabajos").select("*").execute()
+        resp_trabajos = supabase.table("trabajos").select("*").order("fecha", desc=False).execute()
         if resp_trabajos.data:
             for item in resp_trabajos.data:
                 neto_val = float(item.get('neto') if item.get('neto') is not None else item.get('monto_neto', 0))
@@ -46,6 +47,7 @@ def index():
     except Exception as e:
         print(f"Error al consultar trabajos en Supabase: {e}")
 
+    # 2. Obtener Gastos Fijos desde Supabase
     try:
         resp_gastos = supabase.table("gastos_fijos").select("*").execute()
         if resp_gastos.data:
@@ -95,7 +97,7 @@ def exportar_pdf():
     elements.append(Spacer(1, 8))
 
     try:
-        resp_trabajos = supabase.table("trabajos").select("*").execute()
+        resp_trabajos = supabase.table("trabajos").select("*").order("fecha", desc=False).execute()
         datos_trabajos = resp_trabajos.data if resp_trabajos.data else []
     except Exception:
         datos_trabajos = []
@@ -138,7 +140,7 @@ def exportar_pdf():
     elements.append(balance_table)
     elements.append(Spacer(1, 10))
 
-    # 2. Obtener Gráfico desde QuickChart (mismos datos y colores que tu web)
+    # 2. Gráfico desde QuickChart
     meses_nombres = ["Ene", "Feb", "Mar", "Abr", "May", "Jun", "Jul", "Ago", "Sep", "Oct", "Nov", "Dic"]
     ingresos_mensuales = [0] * 12
     egresos_mensuales = [0] * 12
@@ -261,21 +263,23 @@ def exportar_pdf():
 @app.route('/guardar_trabajo', methods=['POST'])
 def agregar_trabajo():
     try:
+        neto_val = float(request.form.get('monto_neto') or request.form.get('neto') or 0)
         nuevo_trabajo = {
             "n_factura": request.form.get('factura', ''),
             "fecha": request.form.get('fecha', ''),
             "cliente": request.form.get('cliente', ''),
             "equipo": request.form.get('equipo', ''),
             "servicio": request.form.get('servicio', ''),
-            "neto": float(request.form.get('monto_neto') or 0),
+            "neto": neto_val,
             "gastos_op": float(request.form.get('gastos_op') or 0),
             "viaticos": float(request.form.get('viaticos') or 0),
-            "estado": request.form.get('estado', 'Pendiente'),
-            "created_at": datetime.now().isoformat()
+            "estado": request.form.get('estado', 'Pendiente')
         }
-        supabase.table("trabajos").insert(nuevo_trabajo).execute()
+        print(f"Insertando trabajo en Supabase: {nuevo_trabajo}")
+        res = supabase.table("trabajos").insert(nuevo_trabajo).execute()
+        print(f"Respuesta de Supabase: {res}")
     except Exception as e:
-        print(f"Error al guardar el trabajo en Supabase: {e}")
+        print(f"❌ Error al guardar el trabajo en Supabase: {e}")
     
     return redirect(url_for('index'))
 
@@ -283,13 +287,14 @@ def agregar_trabajo():
 def editar_trabajo(id):
     if request.method == 'POST':
         try:
+            neto_val = float(request.form.get('monto_neto') or request.form.get('neto') or 0)
             datos_actualizados = {
                 "n_factura": request.form.get('factura', ''),
                 "fecha": request.form.get('fecha', ''),
                 "cliente": request.form.get('cliente', ''),
                 "equipo": request.form.get('equipo', ''),
                 "servicio": request.form.get('servicio', ''),
-                "neto": float(request.form.get('monto_neto') or 0),
+                "neto": neto_val,
                 "gastos_op": float(request.form.get('gastos_op') or 0),
                 "viaticos": float(request.form.get('viaticos') or 0),
                 "estado": request.form.get('estado', 'Pendiente')
