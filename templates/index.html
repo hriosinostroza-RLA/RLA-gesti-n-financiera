@@ -336,19 +336,25 @@
         </div>
         {% if gastos %}
             {% set ns = namespace(gastos_mes={}) %}
+            {% set map_orden = {'enero': '01', 'febrero': '02', 'marzo': '03', 'abril': '04', 'mayo': '05', 'junio': '06', 'julio': '07', 'agosto': '08', 'septiembre': '09', 'octubre': '10', 'noviembre': '11', 'diciembre': '12'} %}
+            
             {% for g in gastos %}
                 {% set periodo_bruto = (g.mes or g.periodo or 'Sin Especificar') | string | trim | title %}
-                {% if periodo_bruto not in ns.gastos_mes %}
-                    {% set _ = ns.gastos_mes.update({periodo_bruto: []}) %}
+                {% set mes_lower = periodo_bruto.split()[0] | lower %}
+                {% set num_orden = map_orden.get(mes_lower, '99') %}
+                {% set clave_orden = num_orden + '_' + periodo_bruto %}
+                
+                {% if clave_orden not in ns.gastos_mes %}
+                    {% set _ = ns.gastos_mes.update({clave_orden: {'nombre': periodo_bruto, 'items': []}}) %}
                 {% endif %}
-                {% set _ = ns.gastos_mes[periodo_bruto].append(g) %}
+                {% set _ = ns.gastos_mes[clave_orden]['items'].append(g) %}
             {% endfor %}
 
-            {% for mes, lista_g in ns.gastos_mes.items() %}
+            {% for clave, grupo in ns.gastos_mes.items() | sort %}
             <details class="mes-acordeon gasto-acordeon">
                 <summary>
-                    <span>📅 {{ mes }}</span>
-                    <span style="font-size: 0.85rem; color: #555;">({{ lista_g | length }} registros)</span>
+                    <span>📅 {{ grupo.nombre }}</span>
+                    <span style="font-size: 0.85rem; color: #555;">({{ grupo.items | length }} registros)</span>
                 </summary>
                 <div class="contenido-acordeon">
                     <table>
@@ -361,7 +367,7 @@
                             </tr>
                         </thead>
                         <tbody>
-                            {% for gasto in lista_g %}
+                            {% for gasto in grupo.items %}
                             <tr>
                                 <td><strong>{{ gasto.concepto }}</strong></td>
                                 <td>{{ gasto.mes or gasto.periodo }}</td>
@@ -398,19 +404,20 @@
                 {% set partes_fecha = (item.fecha or '2026-01-01').split('-') %}
                 {% set num_mes = partes_fecha[1] if partes_fecha | length >= 2 else '01' %}
                 {% set anio_mes = partes_fecha[0] if partes_fecha | length >= 1 else '2026' %}
+                {% set clave_orden = anio_mes + '-' + num_mes %}
                 {% set nombre_mes_str = nombres_meses.get(num_mes, 'Otro') + ' ' + anio_mes %}
                 
-                {% if nombre_mes_str not in ns_t.trabajos_mes %}
-                    {% set _ = ns_t.trabajos_mes.update({nombre_mes_str: []}) %}
+                {% if clave_orden not in ns_t.trabajos_mes %}
+                    {% set _ = ns_t.trabajos_mes.update({clave_orden: {'nombre': nombre_mes_str, 'items': []}}) %}
                 {% endif %}
-                {% set _ = ns_t.trabajos_mes[nombre_mes_str].append(item) %}
+                {% set _ = ns_t.trabajos_mes[clave_orden]['items'].append(item) %}
             {% endfor %}
 
-            {% for mes, lista_t in ns_t.trabajos_mes.items() %}
+            {% for clave, grupo in ns_t.trabajos_mes.items() | sort %}
             <details class="mes-acordeon trabajo-acordeon">
                 <summary>
-                    <span>📅 {{ mes }}</span>
-                    <span style="font-size: 0.85rem; color: #555;">({{ lista_t | length }} facturas/trabajos)</span>
+                    <span>📅 {{ grupo.nombre }}</span>
+                    <span style="font-size: 0.85rem; color: #555;">({{ grupo.items | length }} facturas/trabajos)</span>
                 </summary>
                 <div class="contenido-acordeon">
                     <table>
@@ -428,7 +435,7 @@
                             </tr>
                         </thead>
                         <tbody>
-                            {% for item in lista_t %}
+                            {% for item in grupo.items %}
                             <tr>
                                 <td><strong>{{ item.n_factura }}</strong></td>
                                 <td>{{ item.fecha }}</td>
