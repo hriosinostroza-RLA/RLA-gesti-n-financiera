@@ -145,6 +145,11 @@
         .btn-pay:hover { background-color: #218838; }
         .btn-edit { background-color: #17a2b8; color: white; }
         .btn-edit:hover { background-color: #138496; }
+        .badge-locked {
+            font-size: 0.75rem;
+            color: #888;
+            font-style: italic;
+        }
         
         .btn-control {
             background-color: #495057;
@@ -374,7 +379,11 @@
                                 <td>{{ gasto.mes or gasto.periodo }}</td>
                                 <td>{{ gasto.monto | clp }}</td>
                                 <td>
-                                    <a href="/editar_gasto/{{ gasto.id }}" class="btn-action btn-edit">✏️ Editar</a>
+                                    {% if gasto.editable %}
+                                        <a href="/editar_gasto/{{ gasto.id }}" class="btn-action btn-edit">✏️ Editar</a>
+                                    {% else %}
+                                        <span class="badge-locked">🔒 Edición Expirada</span>
+                                    {% endif %}
                                 </td>
                             </tr>
                             {% endfor %}
@@ -454,7 +463,11 @@
                                         </form>
                                     {% endif %}
                                     
-                                    <a href="/editar_trabajo/{{ item.id }}" class="btn-action btn-edit">✏️ Editar</a>
+                                    {% if item.editable %}
+                                        <a href="/editar_trabajo/{{ item.id }}" class="btn-action btn-edit">✏️ Editar</a>
+                                    {% else %}
+                                        <span class="badge-locked">🔒 Edición Expirada</span>
+                                    {% endif %}
                                 </td>
                             </tr>
                             {% endfor %}
