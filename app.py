@@ -2,7 +2,7 @@ import os
 import io
 import urllib.request
 import json
-from datetime import datetime, date
+from datetime import datetime, date, timedelta
 from flask import Flask, render_template, request, redirect, url_for, send_file
 from supabase import create_client, Client
 from reportlab.lib.pagesizes import letter
@@ -27,12 +27,28 @@ def formato_clp(value):
     except (ValueError, TypeError):
         return "$0"
 
+def es_editable(fecha_str):
+    """Calcula si una fecha está dentro del plazo de 30 días para editar."""
+    if not fecha_str:
+        return True
+    try:
+        # Intenta parsear la fecha (formato YYYY-MM-DD o ISO)
+        if 'T' in fecha_str:
+            fecha_dt = datetime.fromisoformat(fecha_str.split('T')[0]).date()
+        else:
+            fecha_dt = datetime.strptime(fecha_str.split()[0], "%Y-%m-%d").date()
+        
+        dias_transcurridos = (date.today() - fecha_dt).days
+        return dias_transcurridos <= 30
+    except Exception:
+        return True
+
 @app.route('/')
 def index():
     datos_trabajos = []
     datos_gastos = []
 
-    # 1. Obtener Trabajos desde Supabase ordenados por fecha
+    # 1. Obtener Trabajos desde Supabase
     try:
         resp_trabajos = supabase.table("trabajos").select("*").order("fecha", desc=False).execute()
         if resp_trabajos.data:
@@ -42,7 +58,9 @@ def index():
                 item['monto_neto'] = neto_val
                 item['iva'] = neto_val * 0.19
                 item['total_bruto'] = neto_val * 1.19
-                item['editable'] = True
+                
+                # Regla de 30 días
+                item['editable'] = es_editable(item.get('fecha'))
             datos_trabajos = resp_trabajos.data
     except Exception as e:
         print(f"Error al consultar trabajos en Supabase: {e}")
@@ -55,7 +73,10 @@ def index():
                 mes_val = item.get('mes') if item.get('mes') is not None else item.get('periodo', '')
                 item['mes'] = mes_val
                 item['periodo'] = mes_val
-                item['editable'] = True
+                
+                # Regla de 30 días usando created_at o fecha actual si no existe
+                fecha_gasto = item.get('created_at') or date.today().isoformat()
+                item['editable'] = es_editable(fecha_gasto)
             datos_gastos = resp_gastos.data
     except Exception as e:
         print(f"Error al consultar gastos fijos en Supabase: {e}")
@@ -115,7 +136,7 @@ def exportar_pdf():
     egresos = total_gastos_op + total_gastos_fijos
     capital_disponible = total_ingresos - egresos
 
-    # 1. Tabla de Balance General
+    # 1. Tabla Balance General
     elements.append(Paragraph("<b>Resumen de Balance General</b>", subtitle_style))
     balance_data = [
         ["Ingresos (Pagados con IVA)", "Por Cobrar (Pendientes)", "Egresos Op. & Fijos", "Capital Disponible"],
@@ -275,18 +296,23 @@ def agregar_trabajo():
             "viaticos": float(request.form.get('viaticos') or 0),
             "estado": request.form.get('estado', 'Pendiente')
         }
-        print(f"Insertando trabajo en Supabase: {nuevo_trabajo}")
-        res = supabase.table("trabajos").insert(nuevo_trabajo).execute()
-        print(f"Respuesta de Supabase: {res}")
+        supabase.table("trabajos").insert(nuevo_trabajo).execute()
     except Exception as e:
-        print(f"❌ Error al guardar el trabajo en Supabase: {e}")
+        print(f"Error al guardar trabajo: {e}")
     
     return redirect(url_for('index'))
 
 @app.route('/editar_trabajo/<int:id>', methods=['GET', 'POST'])
 def editar_trabajo(id):
-    if request.method == 'POST':
-        try:
+    # Verificar si cumple la ventana de 30 días antes de permitir editar
+    try:
+        resp = supabase.table("trabajos").select("*").eq("id", id).execute()
+        trabajo = resp.data[0] if resp.data else None
+        
+        if trabajo and not es_editable(trabajo.get('fecha')):
+            return "Acceso denegado: El periodo permitido de 30 días para editar este registro ha expirado.", 403
+            
+        if request.method == 'POST':
             neto_val = float(request.form.get('monto_neto') or request.form.get('neto') or 0)
             datos_actualizados = {
                 "n_factura": request.form.get('factura', ''),
@@ -300,13 +326,8 @@ def editar_trabajo(id):
                 "estado": request.form.get('estado', 'Pendiente')
             }
             supabase.table("trabajos").update(datos_actualizados).eq("id", id).execute()
-        except Exception as e:
-            print(f"Error al actualizar trabajo: {e}")
-        return redirect(url_for('index'))
-    
-    try:
-        resp = supabase.table("trabajos").select("*").eq("id", id).execute()
-        trabajo = resp.data[0] if resp.data else None
+            return redirect(url_for('index'))
+            
         if trabajo:
             neto_val = trabajo.get('neto') if trabajo.get('neto') is not None else trabajo.get('monto_neto', 0)
             trabajo['monto_neto'] = neto_val
@@ -336,14 +357,21 @@ def agregar_gasto():
         }
         supabase.table("gastos_fijos").insert(nuevo_gasto).execute()
     except Exception as e:
-        print(f"❌ Error al guardar el gasto fijo en Supabase: {e}")
+        print(f"Error al guardar gasto fijo: {e}")
     
     return redirect(url_for('index'))
 
 @app.route('/editar_gasto/<int:id>', methods=['GET', 'POST'])
 def editar_gasto(id):
-    if request.method == 'POST':
-        try:
+    try:
+        resp = supabase.table("gastos_fijos").select("*").eq("id", id).execute()
+        gasto = resp.data[0] if resp.data else None
+        
+        fecha_gasto = gasto.get('created_at') if gasto else None
+        if gasto and not es_editable(fecha_gasto):
+            return "Acceso denegado: El periodo permitido de 30 días para editar este registro ha expirado.", 403
+
+        if request.method == 'POST':
             periodo_val = request.form.get('periodo') or request.form.get('mes') or 'Sin Especificar'
             datos_actualizados = {
                 "concepto": request.form.get('concepto', ''),
@@ -351,13 +379,8 @@ def editar_gasto(id):
                 "mes": periodo_val
             }
             supabase.table("gastos_fijos").update(datos_actualizados).eq("id", id).execute()
-        except Exception as e:
-            print(f"Error al actualizar gasto fijo: {e}")
-        return redirect(url_for('index'))
-    
-    try:
-        resp = supabase.table("gastos_fijos").select("*").eq("id", id).execute()
-        gasto = resp.data[0] if resp.data else None
+            return redirect(url_for('index'))
+            
         if gasto:
             gasto['periodo'] = gasto.get('mes') or gasto.get('periodo', '')
     except Exception as e:
