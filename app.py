@@ -32,11 +32,10 @@ def es_editable(fecha_str):
     if not fecha_str:
         return True
     try:
-        # Intenta parsear la fecha (formato YYYY-MM-DD o ISO)
-        if 'T' in fecha_str:
-            fecha_dt = datetime.fromisoformat(fecha_str.split('T')[0]).date()
+        if 'T' in str(fecha_str):
+            fecha_dt = datetime.fromisoformat(str(fecha_str).split('T')[0]).date()
         else:
-            fecha_dt = datetime.strptime(fecha_str.split()[0], "%Y-%m-%d").date()
+            fecha_dt = datetime.strptime(str(fecha_str).split()[0], "%Y-%m-%d").date()
         
         dias_transcurridos = (date.today() - fecha_dt).days
         return dias_transcurridos <= 30
@@ -58,8 +57,6 @@ def index():
                 item['monto_neto'] = neto_val
                 item['iva'] = neto_val * 0.19
                 item['total_bruto'] = neto_val * 1.19
-                
-                # Regla de 30 días
                 item['editable'] = es_editable(item.get('fecha'))
             datos_trabajos = resp_trabajos.data
     except Exception as e:
@@ -74,7 +71,7 @@ def index():
                 item['mes'] = mes_val
                 item['periodo'] = mes_val
                 
-                # Regla de 30 días usando created_at o fecha actual si no existe
+                # Evalúa 'created_at' si existe, o permite edición por defecto
                 fecha_gasto = item.get('created_at') or date.today().isoformat()
                 item['editable'] = es_editable(fecha_gasto)
             datos_gastos = resp_gastos.data
@@ -136,7 +133,7 @@ def exportar_pdf():
     egresos = total_gastos_op + total_gastos_fijos
     capital_disponible = total_ingresos - egresos
 
-    # 1. Tabla Balance General
+    # Tabla Balance General
     elements.append(Paragraph("<b>Resumen de Balance General</b>", subtitle_style))
     balance_data = [
         ["Ingresos (Pagados con IVA)", "Por Cobrar (Pendientes)", "Egresos Op. & Fijos", "Capital Disponible"],
@@ -161,7 +158,7 @@ def exportar_pdf():
     elements.append(balance_table)
     elements.append(Spacer(1, 10))
 
-    # 2. Gráfico desde QuickChart
+    # Gráfico QuickChart
     meses_nombres = ["Ene", "Feb", "Mar", "Abr", "May", "Jun", "Jul", "Ago", "Sep", "Oct", "Nov", "Dic"]
     ingresos_mensuales = [0] * 12
     egresos_mensuales = [0] * 12
@@ -227,7 +224,7 @@ def exportar_pdf():
     except Exception as e:
         print(f"No se pudo cargar el gráfico remoto: {e}")
 
-    # 3. Tabla Trabajos PDF
+    # Tabla Trabajos PDF
     elements.append(Paragraph("<b>Historial de Trabajos y Servicios</b>", subtitle_style))
     t_data = [["Factura", "Fecha", "Cliente", "Equipo", "Neto", "Estado"]]
     for item in datos_trabajos:
@@ -254,7 +251,7 @@ def exportar_pdf():
     elements.append(t_table)
     elements.append(Spacer(1, 10))
 
-    # 4. Tabla Gastos Fijos PDF
+    # Tabla Gastos Fijos PDF
     elements.append(Paragraph("<b>Historial de Gastos Fijos</b>", subtitle_style))
     g_data = [["Concepto", "Periodo / Mes", "Monto"]]
     for gasto in datos_gastos:
@@ -294,7 +291,8 @@ def agregar_trabajo():
             "neto": neto_val,
             "gastos_op": float(request.form.get('gastos_op') or 0),
             "viaticos": float(request.form.get('viaticos') or 0),
-            "estado": request.form.get('estado', 'Pendiente')
+            "estado": request.form.get('estado', 'Pendiente'),
+            "created_at": datetime.now().isoformat()
         }
         supabase.table("trabajos").insert(nuevo_trabajo).execute()
     except Exception as e:
@@ -304,13 +302,12 @@ def agregar_trabajo():
 
 @app.route('/editar_trabajo/<int:id>', methods=['GET', 'POST'])
 def editar_trabajo(id):
-    # Verificar si cumple la ventana de 30 días antes de permitir editar
     try:
         resp = supabase.table("trabajos").select("*").eq("id", id).execute()
         trabajo = resp.data[0] if resp.data else None
         
         if trabajo and not es_editable(trabajo.get('fecha')):
-            return "Acceso denegado: El periodo permitido de 30 días para editar este registro ha expirado.", 403
+            return "Acceso denegado: El periodo permitido de 30 días para editar este trabajo ha expirado.", 403
             
         if request.method == 'POST':
             neto_val = float(request.form.get('monto_neto') or request.form.get('neto') or 0)
@@ -353,7 +350,8 @@ def agregar_gasto():
         nuevo_gasto = {
             "concepto": request.form.get('concepto', ''),
             "monto": float(request.form.get('monto') or 0),
-            "mes": periodo_val
+            "mes": periodo_val,
+            "created_at": datetime.now().isoformat()
         }
         supabase.table("gastos_fijos").insert(nuevo_gasto).execute()
     except Exception as e:
@@ -369,7 +367,7 @@ def editar_gasto(id):
         
         fecha_gasto = gasto.get('created_at') if gasto else None
         if gasto and not es_editable(fecha_gasto):
-            return "Acceso denegado: El periodo permitido de 30 días para editar este registro ha expirado.", 403
+            return "Acceso denegado: El periodo permitido de 30 días para editar este gasto ha expirado.", 403
 
         if request.method == 'POST':
             periodo_val = request.form.get('periodo') or request.form.get('mes') or 'Sin Especificar'
