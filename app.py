@@ -27,8 +27,7 @@ def formato_clp(value):
     except (ValueError, TypeError):
         return "$0"
 
-def es_editable(fecha_str):
-    """Calcula si una fecha está dentro del plazo de 30 días para editar."""
+def es_editable_trabajo(fecha_str):
     if not fecha_str:
         return True
     try:
@@ -36,18 +35,70 @@ def es_editable(fecha_str):
             fecha_dt = datetime.fromisoformat(str(fecha_str).split('T')[0]).date()
         else:
             fecha_dt = datetime.strptime(str(fecha_str).split()[0], "%Y-%m-%d").date()
-        
-        dias_transcurridos = (date.today() - fecha_dt).days
-        return dias_transcurridos <= 30
+        return (date.today() - fecha_dt).days <= 30
     except Exception:
         return True
+
+def es_editable_gasto(gasto):
+    """Determina si un gasto fijo es editable según su fecha de creación o su texto de periodo."""
+    # 1. Si tiene created_at real, usar eso
+    created_at = gasto.get('created_at')
+    if created_at:
+        try:
+            fecha_dt = datetime.fromisoformat(str(created_at).split('T')[0]).date()
+            return (date.today() - fecha_dt).days <= 30
+        except Exception:
+            pass
+
+    # 2. Si no tiene created_at, interpretar el texto del mes/periodo (ej. "marzo 2026")
+    texto = str(gasto.get('mes') or gasto.get('periodo') or '').lower()
+    map_meses = {
+        "enero": 1, "january": 1, "ene": 1,
+        "febrero": 2, "february": 2, "feb": 2,
+        "marzo": 3, "march": 3, "mar": 3,
+        "abril": 4, "april": 4, "abr": 4,
+        "mayo": 5, "may": 5,
+        "junio": 6, "june": 6, "jun": 6,
+        "julio": 7, "july": 7, "jul": 7,
+        "agosto": 8, "august": 8, "ago": 8,
+        "septiembre": 9, "september": 9, "sep": 9,
+        "octubre": 10, "october": 10, "oct": 10,
+        "noviembre": 11, "november": 11, "nov": 11,
+        "diciembre": 12, "december": 12, "dic": 12
+    }
+    
+    mes_encontrado = None
+    for nombre, num in map_meses.items():
+        if nombre in texto:
+            mes_encontrado = num
+            break
+            
+    if mes_encontrado:
+        # Intentar extraer año si viene en el texto (ej. 2026), si no asumir año actual
+        anio_encontrado = 2026
+        for palabra in texto.split():
+            if palabra.isdigit() and len(palabra) == 4:
+                anio_encontrado = int(palabra)
+                break
+        
+        # Asignar el último día de ese mes para ser flexibles con la ventana de 30 días
+        try:
+            if mes_encontrado == 12:
+                siguiente_mes = date(anio_encontrado + 1, 1, 1)
+            else:
+                siguiente_mes = date(anio_encontrado, mes_encontrado + 1, 1)
+            limite_edicion = siguiente_mes + timedelta(days=30)
+            return date.today() <= limite_edicion
+        except Exception:
+            pass
+
+    return True
 
 @app.route('/')
 def index():
     datos_trabajos = []
     datos_gastos = []
 
-    # 1. Obtener Trabajos desde Supabase
     try:
         resp_trabajos = supabase.table("trabajos").select("*").order("fecha", desc=False).execute()
         if resp_trabajos.data:
@@ -57,12 +108,11 @@ def index():
                 item['monto_neto'] = neto_val
                 item['iva'] = neto_val * 0.19
                 item['total_bruto'] = neto_val * 1.19
-                item['editable'] = es_editable(item.get('fecha'))
+                item['editable'] = es_editable_trabajo(item.get('fecha'))
             datos_trabajos = resp_trabajos.data
     except Exception as e:
-        print(f"Error al consultar trabajos en Supabase: {e}")
+        print(f"Error al consultar trabajos: {e}")
 
-    # 2. Obtener Gastos Fijos desde Supabase
     try:
         resp_gastos = supabase.table("gastos_fijos").select("*").execute()
         if resp_gastos.data:
@@ -70,13 +120,10 @@ def index():
                 mes_val = item.get('mes') if item.get('mes') is not None else item.get('periodo', '')
                 item['mes'] = mes_val
                 item['periodo'] = mes_val
-                
-                # Evalúa 'created_at' si existe, o permite edición por defecto
-                fecha_gasto = item.get('created_at') or date.today().isoformat()
-                item['editable'] = es_editable(fecha_gasto)
+                item['editable'] = es_editable_gasto(item)
             datos_gastos = resp_gastos.data
     except Exception as e:
-        print(f"Error al consultar gastos fijos en Supabase: {e}")
+        print(f"Error al consultar gastos fijos: {e}")
 
     total_ingresos = sum(float(item.get('total_bruto', 0)) for item in datos_trabajos if str(item.get('estado', '')).lower() in ['pagado', 'completado'])
     total_pendientes = sum(float(item.get('total_bruto', 0)) for item in datos_trabajos if str(item.get('estado', '')).lower() not in ['pagado', 'completado'])
@@ -222,7 +269,7 @@ def exportar_pdf():
         elements.append(Image(io.BytesIO(chart_img_data), width=500, height=180))
         elements.append(Spacer(1, 10))
     except Exception as e:
-        print(f"No se pudo cargar el gráfico remoto: {e}")
+        print(f"Error gráfico PDF: {e}")
 
     # Tabla Trabajos PDF
     elements.append(Paragraph("<b>Historial de Trabajos y Servicios</b>", subtitle_style))
@@ -306,7 +353,7 @@ def editar_trabajo(id):
         resp = supabase.table("trabajos").select("*").eq("id", id).execute()
         trabajo = resp.data[0] if resp.data else None
         
-        if trabajo and not es_editable(trabajo.get('fecha')):
+        if trabajo and not es_editable_trabajo(trabajo.get('fecha')):
             return "Acceso denegado: El periodo permitido de 30 días para editar este trabajo ha expirado.", 403
             
         if request.method == 'POST':
@@ -365,8 +412,7 @@ def editar_gasto(id):
         resp = supabase.table("gastos_fijos").select("*").eq("id", id).execute()
         gasto = resp.data[0] if resp.data else None
         
-        fecha_gasto = gasto.get('created_at') if gasto else None
-        if gasto and not es_editable(fecha_gasto):
+        if gasto and not es_editable_gasto(gasto):
             return "Acceso denegado: El periodo permitido de 30 días para editar este gasto ha expirado.", 403
 
         if request.method == 'POST':
