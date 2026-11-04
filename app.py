@@ -40,8 +40,6 @@ def es_editable_trabajo(fecha_str):
         return True
 
 def es_editable_gasto(gasto):
-    """Determina si un gasto fijo es editable según su fecha de creación o su texto de periodo."""
-    # 1. Si tiene created_at real, usar eso
     created_at = gasto.get('created_at')
     if created_at:
         try:
@@ -50,7 +48,6 @@ def es_editable_gasto(gasto):
         except Exception:
             pass
 
-    # 2. Si no tiene created_at, interpretar el texto del mes/periodo (ej. "marzo 2026")
     texto = str(gasto.get('mes') or gasto.get('periodo') or '').lower()
     map_meses = {
         "enero": 1, "january": 1, "ene": 1,
@@ -74,14 +71,12 @@ def es_editable_gasto(gasto):
             break
             
     if mes_encontrado:
-        # Intentar extraer año si viene en el texto (ej. 2026), si no asumir año actual
         anio_encontrado = 2026
         for palabra in texto.split():
             if palabra.isdigit() and len(palabra) == 4:
                 anio_encontrado = int(palabra)
                 break
         
-        # Asignar el último día de ese mes para ser flexibles con la ventana de 30 días
         try:
             if mes_encontrado == 12:
                 siguiente_mes = date(anio_encontrado + 1, 1, 1)
@@ -400,9 +395,11 @@ def agregar_gasto():
             "mes": periodo_val,
             "created_at": datetime.now().isoformat()
         }
-        supabase.table("gastos_fijos").insert(nuevo_gasto).execute()
+        print(f"Insertando gasto fijo: {nuevo_gasto}")
+        res = supabase.table("gastos_fijos").insert(nuevo_gasto).execute()
+        print(f"Respuesta Supabase gasto: {res}")
     except Exception as e:
-        print(f"Error al guardar gasto fijo: {e}")
+        print(f"❌ Error al guardar gasto fijo: {e}")
     
     return redirect(url_for('index'))
 
