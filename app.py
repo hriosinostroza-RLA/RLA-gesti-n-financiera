@@ -28,10 +28,8 @@ def formato_clp(value):
         return "$0"
 
 def es_editable_basado_en_creacion(item):
-    """Calcula si han pasado menos de 30 días desde que se creó/registró el ítem."""
     created_at = item.get('created_at')
     if not created_at:
-        # Si por alguna razón antigua no tiene created_at, permitimos editar por seguridad
         return True
     try:
         if 'T' in str(created_at):
@@ -57,7 +55,6 @@ def index():
                 item['monto_neto'] = neto_val
                 item['iva'] = neto_val * 0.19
                 item['total_bruto'] = neto_val * 1.19
-                # La edición se evalúa estrictamente según el momento del registro
                 item['editable'] = es_editable_basado_en_creacion(item)
             datos_trabajos = resp_trabajos.data
     except Exception as e:
@@ -70,7 +67,6 @@ def index():
                 mes_val = item.get('mes') if item.get('mes') is not None else item.get('periodo', '')
                 item['mes'] = mes_val
                 item['periodo'] = mes_val
-                # La edición se evalúa estrictamente según el momento del registro
                 item['editable'] = es_editable_basado_en_creacion(item)
             datos_gastos = resp_gastos.data
     except Exception as e:
@@ -80,8 +76,11 @@ def index():
     total_pendientes = sum(float(item.get('total_bruto', 0)) for item in datos_trabajos if str(item.get('estado', '')).lower() not in ['pagado', 'completado'])
     
     total_gastos_op = sum(float(item.get('gastos_op') or 0) for item in datos_trabajos)
+    total_viaticos = sum(float(item.get('viaticos') or 0) for item in datos_trabajos)
     total_gastos_fijos = sum(float(item.get('monto') or 0) for item in datos_gastos)
-    egresos = total_gastos_op + total_gastos_fijos
+    
+    # Egresos totales = Gastos Operativos de Trabajos + Viáticos + Gastos Fijos
+    egresos = total_gastos_op + total_viaticos + total_gastos_fijos
 
     capital_disponible = total_ingresos - egresos
 
@@ -127,14 +126,15 @@ def exportar_pdf():
     total_ingresos = sum(float(item.get('neto', item.get('monto_neto', 0)) * 1.19) for item in datos_trabajos if str(item.get('estado', '')).lower() in ['pagado', 'completado'])
     total_pendientes = sum(float(item.get('neto', item.get('monto_neto', 0)) * 1.19) for item in datos_trabajos if str(item.get('estado', '')).lower() not in ['pagado', 'completado'])
     total_gastos_op = sum(float(item.get('gastos_op') or 0) for item in datos_trabajos)
+    total_viaticos = sum(float(item.get('viaticos') or 0) for item in datos_trabajos)
     total_gastos_fijos = sum(float(item.get('monto') or 0) for item in datos_gastos)
-    egresos = total_gastos_op + total_gastos_fijos
+    egresos = total_gastos_op + total_viaticos + total_gastos_fijos
     capital_disponible = total_ingresos - egresos
 
     # Tabla Balance General
     elements.append(Paragraph("<b>Resumen de Balance General</b>", subtitle_style))
     balance_data = [
-        ["Ingresos (Pagados con IVA)", "Por Cobrar (Pendientes)", "Egresos Op. & Fijos", "Capital Disponible"],
+        ["Ingresos (Pagados con IVA)", "Por Cobrar (Pendientes)", "Egresos Totales", "Capital Disponible"],
         [
             f"${int(total_ingresos):,}".replace(",", "."),
             f"${int(total_pendientes):,}".replace(",", "."),
@@ -170,7 +170,7 @@ def exportar_pdf():
                     if str(item.get('estado', '')).lower() in ['pagado', 'completado']:
                         neto_val = float(item.get('neto', item.get('monto_neto', 0)))
                         ingresos_mensuales[m] += neto_val * 1.19
-                    egresos_mensuales[m] += float(item.get('gastos_op', 0))
+                    egresos_mensuales[m] += float(item.get('gastos_op', 0) or 0) + float(item.get('viaticos', 0) or 0)
             except Exception:
                 pass
 
@@ -205,7 +205,7 @@ def exportar_pdf():
             "labels": meses_nombres,
             "datasets": [
                 {"label": "Ingresos (Pagados)", "data": ingresos_mensuales, "backgroundColor": "#28a745"},
-                {"label": "Egresos (Op. & Fijos)", "data": egresos_mensuales, "backgroundColor": "#dc3545"}
+                {"label": "Egresos Totales", "data": egresos_mensuales, "backgroundColor": "#dc3545"}
             ]
         },
         "options": {
@@ -224,7 +224,7 @@ def exportar_pdf():
 
     # Tabla Trabajos PDF
     elements.append(Paragraph("<b>Historial de Trabajos y Servicios</b>", subtitle_style))
-    t_data = [["Factura", "Fecha", "Cliente", "Equipo", "Neto", "Estado"]]
+    t_data = [["Factura", "Fecha", "Cliente", "Equipo", "Neto", "G. Op.", "Viáticos", "Estado"]]
     for item in datos_trabajos:
         neto_val = item.get('neto') or item.get('monto_neto', 0)
         t_data.append([
@@ -233,10 +233,12 @@ def exportar_pdf():
             str(item.get('cliente', '')),
             str(item.get('equipo', '')),
             f"${int(neto_val):,}".replace(",", "."),
+            f"${int(item.get('gastos_op', 0)):,}".replace(",", "."),
+            f"${int(item.get('viaticos', 0)):,}".replace(",", "."),
             str(item.get('estado', ''))
         ])
     
-    t_table = Table(t_data, colWidths=[55, 65, 100, 110, 80, 80])
+    t_table = Table(t_data, colWidths=[45, 60, 95, 100, 75, 55, 55, 55])
     t_table.setStyle(TableStyle([
         ('BACKGROUND', (0, 0), (-1, 0), colors.HexColor('#22252a')),
         ('TEXTCOLOR', (0, 0), (-1, 0), colors.white),
@@ -250,7 +252,7 @@ def exportar_pdf():
     elements.append(Spacer(1, 10))
 
     # Tabla Gastos Fijos PDF
-    elements.append(Paragraph("<b>Historial de Gastos Fijos</b>", subtitle_style))
+    elements.append(Paragraph("<b>Historial de Gastos Fijos / Materiales</b>", subtitle_style))
     g_data = [["Concepto", "Periodo / Mes", "Monto"]]
     for gasto in datos_gastos:
         g_data.append([
@@ -351,9 +353,7 @@ def agregar_gasto():
             "mes": periodo_val,
             "created_at": datetime.now().isoformat()
         }
-        print(f"Insertando gasto fijo: {nuevo_gasto}")
-        res = supabase.table("gastos_fijos").insert(nuevo_gasto).execute()
-        print(f"Respuesta Supabase gasto: {res}")
+        supabase.table("gastos_fijos").insert(nuevo_gasto).execute()
     except Exception as e:
         print(f"❌ Error al guardar gasto fijo: {e}")
     
