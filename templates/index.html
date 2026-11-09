@@ -238,7 +238,7 @@
             <div class="card-value">{{ total_pendientes | clp }}</div>
         </div>
         <div class="card red">
-            <div class="card-title">Egresos Op. & Fijos</div>
+            <div class="card-title">Egresos Totales</div>
             <div class="card-value">{{ total_egresos | clp }}</div>
         </div>
         <div class="card blue">
@@ -310,12 +310,12 @@
 
     <!-- Formulario: Gasto Fijo -->
     <div class="section-box">
-        <div class="section-title"><span>📉 Registro de Gasto Fijo Mensual</span></div>
+        <div class="section-title"><span>📉 Registro de Gasto Fijo / Materiales</span></div>
         <form action="/agregar_gasto" method="POST">
             <div class="form-grid">
                 <div class="form-group">
-                    <label>Concepto del Gasto Fijo</label>
-                    <input type="text" name="concepto" placeholder="Ej. Arriendo Taller, Contador" required>
+                    <label>Concepto del Gasto</label>
+                    <input type="text" name="concepto" placeholder="Ej. Arriendo, Materiales, Contador" required>
                 </div>
                 <div class="form-group">
                     <label>Monto ($)</label>
@@ -326,14 +326,14 @@
                     <input type="text" name="periodo" placeholder="Ej. Mayo 2026" required>
                 </div>
             </div>
-            <button type="submit" class="btn-submit red-btn">📉 Registrar Gasto Fijo</button>
+            <button type="submit" class="btn-submit red-btn">📉 Registrar Gasto</button>
         </form>
     </div>
 
     <!-- Historial de Gastos Fijos -->
     <div class="section-box">
         <div class="section-title">
-            <span>📋 Historial de Gastos Fijos</span>
+            <span>📋 Historial de Gastos Fijos / Materiales</span>
             <div>
                 <button type="button" class="btn-control" onclick="toggleAcordeones('gastos', true)">📂 Abrir Todos</button>
                 <button type="button" class="btn-control" onclick="toggleAcordeones('gastos', false)">📁 Cerrar Todos</button>
@@ -441,6 +441,8 @@
                                 <th>Neto</th>
                                 <th>IVA (19%)</th>
                                 <th>Total Bruto</th>
+                                <th>Gastos Op.</th>
+                                <th>Viáticos</th>
                                 <th>Estado</th>
                                 <th>Acciones</th>
                             </tr>
@@ -455,6 +457,8 @@
                                 <td>{{ item.neto | clp }}</td>
                                 <td>{{ item.iva | clp }}</td>
                                 <td><strong>{{ item.total_bruto | clp }}</strong></td>
+                                <td>{{ (item.gastos_op or 0) | clp }}</td>
+                                <td>{{ (item.viaticos or 0) | clp }}</td>
                                 <td>{{ item.estado }}</td>
                                 <td>
                                     {% if item.estado != 'Pagado' and item.estado != 'Completado' %}
@@ -501,7 +505,7 @@
             {
                 fecha: "{{ item.fecha }}",
                 ingreso: {% if item.estado | lower in ['pagado', 'completado'] %}{{ item.total_bruto }}{% else %}0{% endif %},
-                egreso: {{ item.gastos_op or 0 }}
+                egreso: {{ (item.gastos_op or 0) + (item.viaticos or 0) }}
             },
         {% endfor %}
     ];
@@ -584,7 +588,7 @@
                     borderRadius: 4
                 },
                 {
-                    label: 'Egresos (Op. & Fijos)',
+                    label: 'Egresos Totales',
                     data: dataEgresos,
                     backgroundColor: '#dc3545',
                     borderRadius: 4
