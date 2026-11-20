@@ -69,15 +69,23 @@ def es_editable_trabajo(item):
 
 def es_editable_gasto(item):
     """
-    Permite editar solo si han pasado <= 30 días desde created_at.
-    Si no tiene created_at, evalúa según el periodo/mes del gasto respecto a hoy.
+    Evalúa si un gasto es editable (<= 30 días):
+    1. Prioriza 'created_at' si existe en el registro.
+    2. Si no hay 'created_at', revisa el mes/año en el texto del periodo:
+       - Si tiene año explícito (ej: 'nov 2025'), usa ese año.
+       - Si no tiene año explícito (ej: 'octubre'), asume el año en curso.
+       - Bloquea si han pasado más de 30 días desde el fin de ese mes.
     """
     hoy = date.today()
+
     fecha_creacion = _parsear_fecha(item.get('created_at'))
     if fecha_creacion:
         return (hoy - fecha_creacion).days <= 30
 
-    texto = str(item.get('mes') or item.get('periodo') or '').lower()
+    texto = str(item.get('mes') or item.get('periodo') or '').strip().lower()
+    if not texto:
+        return False
+
     map_meses = {
         "enero": 1, "january": 1, "ene": 1,
         "febrero": 2, "february": 2, "feb": 2,
@@ -87,7 +95,7 @@ def es_editable_gasto(item):
         "junio": 6, "june": 6, "jun": 6,
         "julio": 7, "july": 7, "jul": 7,
         "agosto": 8, "august": 8, "ago": 8,
-        "septiembre": 9, "september": 9, "sep": 9,
+        "septiembre": 9, "september": 9, "sep": 9, "setiembre": 9,
         "octubre": 10, "october": 10, "oct": 10,
         "noviembre": 11, "november": 11, "nov": 11,
         "diciembre": 12, "december": 12, "dic": 12
@@ -99,35 +107,24 @@ def es_editable_gasto(item):
             mes_encontrado = num
             break
 
-    if mes_encontrado:
-        anio_encontrado = None
-        for palabra in texto.replace(",", " ").split():
-            if palabra.isdigit() and len(palabra) == 4:
-                anio_encontrado = int(palabra)
-                break
+    if not mes_encontrado:
+        return False
 
-        # Si el texto no especifica año, inferir el año más cercano a 'hoy'
-        if anio_encontrado is None:
-            candidato_actual = date(hoy.year, mes_encontrado, 1)
-            candidato_anterior = date(hoy.year - 1, mes_encontrado, 1)
-            # Elegir la fecha más cercana a hoy (sin proyectar meses futuros lejanos)
-            if abs((hoy - candidato_actual).days) <= abs((hoy - candidato_anterior).days):
-                anio_encontrado = hoy.year
-            else:
-                anio_encontrado = hoy.year - 1
+    anio_encontrado = hoy.year
+    for palabra in texto.replace(",", " ").split():
+        if palabra.isdigit() and len(palabra) == 4:
+            anio_encontrado = int(palabra)
+            break
 
-        # Fecha de referencia: último día del mes del periodo
-        if mes_encontrado == 12:
-            fin_de_mes = date(anio_encontrado + 1, 1, 1) - timedelta(days=1)
-        else:
-            fin_de_mes = date(anio_encontrado, mes_encontrado + 1, 1) - timedelta(days=1)
+    if mes_encontrado == 12:
+        fin_de_mes = date(anio_encontrado + 1, 1, 1) - timedelta(days=1)
+    else:
+        fin_de_mes = date(anio_encontrado, mes_encontrado + 1, 1) - timedelta(days=1)
 
-        # Si el mes ya terminó, contar días desde fin_de_mes; si es un mes futuro, permitir editar
-        if hoy <= fin_de_mes:
-            return True
-        return (hoy - fin_de_mes).days <= 30
+    if hoy <= fin_de_mes:
+        return True
 
-    return False
+    return (hoy - fin_de_mes).days <= 30
 
 @app.route('/')
 def index():
