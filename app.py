@@ -1,6 +1,7 @@
 import os
 import io
 import urllib.request
+import urllib.parse
 import json
 from datetime import datetime, date, timedelta
 from flask import Flask, render_template, request, redirect, url_for, send_file
@@ -23,9 +24,27 @@ supabase: Client = create_client(SUPABASE_URL, SUPABASE_KEY)
 @app.template_filter('clp')
 def formato_clp(value):
     try:
-        return f"${int(value):,}".replace(",", ".")
+        return f"${int(float(value)):,}".replace(",", ".")
     except (ValueError, TypeError):
         return "$0"
+
+def limpiar_monto(valor):
+    """Convierte entradas de texto o número (ej: '$35.000', '35000', '35.000') a float."""
+    if valor is None:
+        return 0.0
+    if isinstance(valor, (int, float)):
+        return float(valor)
+    texto = str(valor).strip().replace("$", "").replace(" ", "")
+    # En formato CLP, los puntos son separadores de miles; si hay coma decimal, se cambia a punto
+    if "," in texto and "." in texto:
+        texto = texto.replace(".", "").replace(",", ".")
+    elif "." in texto:
+        # Si tiene un punto y 3 dígitos después (ej: 35.000), quitar el punto de miles
+        partes = texto.split(".")
+        if len(partes) == 2 and len(partes[1]) == 3 and partes[1].isdigit():
+            texto = "".join(partes)
+    texto = texto.replace(",", ".")
+    return float(texto or 0)
 
 def es_editable_basado_en_creacion(item):
     created_at = item.get('created_at')
@@ -50,7 +69,7 @@ def index():
         resp_trabajos = supabase.table("trabajos").select("*").order("fecha", desc=False).execute()
         if resp_trabajos.data:
             for item in resp_trabajos.data:
-                neto_val = float(item.get('neto') if item.get('neto') is not None else item.get('monto_neto', 0))
+                neto_val = limpiar_monto(item.get('neto') if item.get('neto') is not None else item.get('monto_neto', 0))
                 item['neto'] = neto_val
                 item['monto_neto'] = neto_val
                 item['iva'] = neto_val * 0.19
@@ -67,6 +86,7 @@ def index():
                 mes_val = item.get('mes') if item.get('mes') is not None else item.get('periodo', '')
                 item['mes'] = mes_val
                 item['periodo'] = mes_val
+                item['monto'] = limpiar_monto(item.get('monto', 0))
                 item['editable'] = es_editable_basado_en_creacion(item)
             datos_gastos = resp_gastos.data
     except Exception as e:
@@ -75,13 +95,11 @@ def index():
     total_ingresos = sum(float(item.get('total_bruto', 0)) for item in datos_trabajos if str(item.get('estado', '')).lower() in ['pagado', 'completado'])
     total_pendientes = sum(float(item.get('total_bruto', 0)) for item in datos_trabajos if str(item.get('estado', '')).lower() not in ['pagado', 'completado'])
     
-    total_gastos_op = sum(float(item.get('gastos_op') or 0) for item in datos_trabajos)
-    total_viaticos = sum(float(item.get('viaticos') or 0) for item in datos_trabajos)
-    total_gastos_fijos = sum(float(item.get('monto') or 0) for item in datos_gastos)
+    total_gastos_op = sum(limpiar_monto(item.get('gastos_op') or 0) for item in datos_trabajos)
+    total_viaticos = sum(limpiar_monto(item.get('viaticos') or 0) for item in datos_trabajos)
+    total_gastos_fijos = sum(limpiar_monto(item.get('monto') or 0) for item in datos_gastos)
     
-    # Egresos totales = Gastos Operativos de Trabajos + Viáticos + Gastos Fijos
     egresos = total_gastos_op + total_viaticos + total_gastos_fijos
-
     capital_disponible = total_ingresos - egresos
 
     return render_template(
@@ -123,15 +141,14 @@ def exportar_pdf():
     except Exception:
         datos_gastos = []
 
-    total_ingresos = sum(float(item.get('neto', item.get('monto_neto', 0)) * 1.19) for item in datos_trabajos if str(item.get('estado', '')).lower() in ['pagado', 'completado'])
-    total_pendientes = sum(float(item.get('neto', item.get('monto_neto', 0)) * 1.19) for item in datos_trabajos if str(item.get('estado', '')).lower() not in ['pagado', 'completado'])
-    total_gastos_op = sum(float(item.get('gastos_op') or 0) for item in datos_trabajos)
-    total_viaticos = sum(float(item.get('viaticos') or 0) for item in datos_trabajos)
-    total_gastos_fijos = sum(float(item.get('monto') or 0) for item in datos_gastos)
+    total_ingresos = sum(limpiar_monto(item.get('neto', item.get('monto_neto', 0))) * 1.19 for item in datos_trabajos if str(item.get('estado', '')).lower() in ['pagado', 'completado'])
+    total_pendientes = sum(limpiar_monto(item.get('neto', item.get('monto_neto', 0))) * 1.19 for item in datos_trabajos if str(item.get('estado', '')).lower() not in ['pagado', 'completado'])
+    total_gastos_op = sum(limpiar_monto(item.get('gastos_op') or 0) for item in datos_trabajos)
+    total_viaticos = sum(limpiar_monto(item.get('viaticos') or 0) for item in datos_trabajos)
+    total_gastos_fijos = sum(limpiar_monto(item.get('monto') or 0) for item in datos_gastos)
     egresos = total_gastos_op + total_viaticos + total_gastos_fijos
     capital_disponible = total_ingresos - egresos
 
-    # Tabla Balance General
     elements.append(Paragraph("<b>Resumen de Balance General</b>", subtitle_style))
     balance_data = [
         ["Ingresos (Pagados con IVA)", "Por Cobrar (Pendientes)", "Egresos Totales", "Capital Disponible"],
@@ -156,7 +173,6 @@ def exportar_pdf():
     elements.append(balance_table)
     elements.append(Spacer(1, 10))
 
-    # Gráfico QuickChart
     meses_nombres = ["Ene", "Feb", "Mar", "Abr", "May", "Jun", "Jul", "Ago", "Sep", "Oct", "Nov", "Dic"]
     ingresos_mensuales = [0] * 12
     egresos_mensuales = [0] * 12
@@ -168,9 +184,9 @@ def exportar_pdf():
                 m = int(fecha.split('-')[1]) - 1
                 if 0 <= m < 12:
                     if str(item.get('estado', '')).lower() in ['pagado', 'completado']:
-                        neto_val = float(item.get('neto', item.get('monto_neto', 0)))
+                        neto_val = limpiar_monto(item.get('neto', item.get('monto_neto', 0)))
                         ingresos_mensuales[m] += neto_val * 1.19
-                    egresos_mensuales[m] += float(item.get('gastos_op', 0) or 0) + float(item.get('viaticos', 0) or 0)
+                    egresos_mensuales[m] += limpiar_monto(item.get('gastos_op', 0) or 0) + limpiar_monto(item.get('viaticos', 0) or 0)
             except Exception:
                 pass
 
@@ -197,7 +213,7 @@ def exportar_pdf():
                 m_idx = idx
                 break
         if m_idx is not None:
-            egresos_mensuales[m_idx] += float(gasto.get('monto', 0))
+            egresos_mensuales[m_idx] += limpiar_monto(gasto.get('monto', 0))
 
     chart_config = {
         "type": "bar",
@@ -222,19 +238,18 @@ def exportar_pdf():
     except Exception as e:
         print(f"Error gráfico PDF: {e}")
 
-    # Tabla Trabajos PDF
     elements.append(Paragraph("<b>Historial de Trabajos y Servicios</b>", subtitle_style))
     t_data = [["Factura", "Fecha", "Cliente", "Equipo", "Neto", "G. Op.", "Viáticos", "Estado"]]
     for item in datos_trabajos:
-        neto_val = item.get('neto') or item.get('monto_neto', 0)
+        neto_val = limpiar_monto(item.get('neto') or item.get('monto_neto', 0))
         t_data.append([
             str(item.get('n_factura', '')),
             str(item.get('fecha', '')),
             str(item.get('cliente', '')),
             str(item.get('equipo', '')),
             f"${int(neto_val):,}".replace(",", "."),
-            f"${int(item.get('gastos_op', 0)):,}".replace(",", "."),
-            f"${int(item.get('viaticos', 0)):,}".replace(",", "."),
+            f"${int(limpiar_monto(item.get('gastos_op', 0))):,}".replace(",", "."),
+            f"${int(limpiar_monto(item.get('viaticos', 0))):,}".replace(",", "."),
             str(item.get('estado', ''))
         ])
     
@@ -251,14 +266,13 @@ def exportar_pdf():
     elements.append(t_table)
     elements.append(Spacer(1, 10))
 
-    # Tabla Gastos Fijos PDF
     elements.append(Paragraph("<b>Historial de Gastos Fijos / Materiales</b>", subtitle_style))
     g_data = [["Concepto", "Periodo / Mes", "Monto"]]
     for gasto in datos_gastos:
         g_data.append([
             str(gasto.get('concepto', '')),
             str(gasto.get('mes', '') or gasto.get('periodo', '')),
-            f"${int(gasto.get('monto', 0)):,}".replace(",", ".")
+            f"${int(limpiar_monto(gasto.get('monto', 0))):,}".replace(",", ".")
         ])
     
     g_table = Table(g_data, colWidths=[200, 150, 140])
@@ -281,22 +295,22 @@ def exportar_pdf():
 @app.route('/guardar_trabajo', methods=['POST'])
 def agregar_trabajo():
     try:
-        neto_val = float(request.form.get('monto_neto') or request.form.get('neto') or 0)
+        neto_val = limpiar_monto(request.form.get('monto_neto') or request.form.get('neto') or 0)
         nuevo_trabajo = {
-            "n_factura": request.form.get('factura', ''),
-            "fecha": request.form.get('fecha', ''),
-            "cliente": request.form.get('cliente', ''),
-            "equipo": request.form.get('equipo', ''),
-            "servicio": request.form.get('servicio', ''),
+            "n_factura": str(request.form.get('factura', '')).strip(),
+            "fecha": str(request.form.get('fecha', '')).strip(),
+            "cliente": str(request.form.get('cliente', '')).strip(),
+            "equipo": str(request.form.get('equipo', '')).strip(),
+            "servicio": str(request.form.get('servicio', '')).strip(),
             "neto": neto_val,
-            "gastos_op": float(request.form.get('gastos_op') or 0),
-            "viaticos": float(request.form.get('viaticos') or 0),
-            "estado": request.form.get('estado', 'Pendiente'),
+            "gastos_op": limpiar_monto(request.form.get('gastos_op') or 0),
+            "viaticos": limpiar_monto(request.form.get('viaticos') or 0),
+            "estado": str(request.form.get('estado', 'Pendiente')).strip(),
             "created_at": datetime.now().isoformat()
         }
         supabase.table("trabajos").insert(nuevo_trabajo).execute()
     except Exception as e:
-        print(f"Error al guardar trabajo: {e}")
+        print(f"❌ Error al guardar trabajo: {e}")
     
     return redirect(url_for('index'))
 
@@ -310,24 +324,24 @@ def editar_trabajo(id):
             return "Acceso denegado: El periodo permitido de 30 días desde el registro de este trabajo ha expirado.", 403
             
         if request.method == 'POST':
-            neto_val = float(request.form.get('monto_neto') or request.form.get('neto') or 0)
+            neto_val = limpiar_monto(request.form.get('monto_neto') or request.form.get('neto') or 0)
             datos_actualizados = {
-                "n_factura": request.form.get('factura', ''),
-                "fecha": request.form.get('fecha', ''),
-                "cliente": request.form.get('cliente', ''),
-                "equipo": request.form.get('equipo', ''),
-                "servicio": request.form.get('servicio', ''),
+                "n_factura": str(request.form.get('factura', '')).strip(),
+                "fecha": str(request.form.get('fecha', '')).strip(),
+                "cliente": str(request.form.get('cliente', '')).strip(),
+                "equipo": str(request.form.get('equipo', '')).strip(),
+                "servicio": str(request.form.get('servicio', '')).strip(),
                 "neto": neto_val,
-                "gastos_op": float(request.form.get('gastos_op') or 0),
-                "viaticos": float(request.form.get('viaticos') or 0),
-                "estado": request.form.get('estado', 'Pendiente')
+                "gastos_op": limpiar_monto(request.form.get('gastos_op') or 0),
+                "viaticos": limpiar_monto(request.form.get('viaticos') or 0),
+                "estado": str(request.form.get('estado', 'Pendiente')).strip()
             }
             supabase.table("trabajos").update(datos_actualizados).eq("id", id).execute()
             return redirect(url_for('index'))
             
         if trabajo:
             neto_val = trabajo.get('neto') if trabajo.get('neto') is not None else trabajo.get('monto_neto', 0)
-            trabajo['monto_neto'] = neto_val
+            trabajo['monto_neto'] = limpiar_monto(neto_val)
     except Exception as e:
         print(f"Error al obtener trabajo para editar: {e}")
         trabajo = None
@@ -346,16 +360,33 @@ def marcar_pagado(id):
 @app.route('/guardar_gasto', methods=['POST'])
 def agregar_gasto():
     try:
-        periodo_val = request.form.get('periodo') or request.form.get('mes') or 'Sin Especificar'
-        nuevo_gasto = {
-            "concepto": request.form.get('concepto', ''),
-            "monto": float(request.form.get('monto') or 0),
+        concepto_val = str(request.form.get('concepto') or '').strip()
+        monto_val = limpiar_monto(request.form.get('monto') or 0)
+        periodo_val = str(request.form.get('periodo') or request.form.get('mes') or 'Sin Especificar').strip()
+
+        # Intenta insertar con created_at; si Supabase rechaza por columna faltante, reintenta sin created_at
+        payload_con_fecha = {
+            "concepto": concepto_val,
+            "monto": monto_val,
             "mes": periodo_val,
             "created_at": datetime.now().isoformat()
         }
-        supabase.table("gastos_fijos").insert(nuevo_gasto).execute()
+        try:
+            res = supabase.table("gastos_fijos").insert(payload_con_fecha).execute()
+            if not res.data:
+                raise Exception("Inserción sin datos devueltos con created_at")
+        except Exception as e_fecha:
+            print(f"Reintentando insertar gasto sin created_at ({e_fecha})")
+            payload_sin_fecha = {
+                "concepto": concepto_val,
+                "monto": monto_val,
+                "mes": periodo_val
+            }
+            res2 = supabase.table("gastos_fijos").insert(payload_sin_fecha).execute()
+            print(f"Respuesta inserción gasto sin created_at: {res2}")
+
     except Exception as e:
-        print(f"❌ Error al guardar gasto fijo: {e}")
+        print(f"❌ Error crítico al guardar gasto fijo: {e}")
     
     return redirect(url_for('index'))
 
@@ -369,10 +400,10 @@ def editar_gasto(id):
             return "Acceso denegado: El periodo permitido de 30 días desde el registro de este gasto ha expirado.", 403
 
         if request.method == 'POST':
-            periodo_val = request.form.get('periodo') or request.form.get('mes') or 'Sin Especificar'
+            periodo_val = str(request.form.get('periodo') or request.form.get('mes') or 'Sin Especificar').strip()
             datos_actualizados = {
-                "concepto": request.form.get('concepto', ''),
-                "monto": float(request.form.get('monto') or 0),
+                "concepto": str(request.form.get('concepto', '')).strip(),
+                "monto": limpiar_monto(request.form.get('monto') or 0),
                 "mes": periodo_val
             }
             supabase.table("gastos_fijos").update(datos_actualizados).eq("id", id).execute()
@@ -380,6 +411,7 @@ def editar_gasto(id):
             
         if gasto:
             gasto['periodo'] = gasto.get('mes') or gasto.get('periodo', '')
+            gasto['monto'] = limpiar_monto(gasto.get('monto', 0))
     except Exception as e:
         print(f"Error al obtener gasto fijo para editar: {e}")
         gasto = None
