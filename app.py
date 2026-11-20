@@ -68,7 +68,10 @@ def es_editable_trabajo(item):
     return False
 
 def es_editable_gasto(item):
-    """Permite editar solo si han pasado <= 30 días desde created_at, o según el periodo si no tiene created_at."""
+    """
+    Permite editar solo si han pasado <= 30 días desde created_at.
+    Si no tiene created_at, evalúa según el periodo/mes del gasto respecto a hoy.
+    """
     hoy = date.today()
     fecha_creacion = _parsear_fecha(item.get('created_at'))
     if fecha_creacion:
@@ -97,20 +100,32 @@ def es_editable_gasto(item):
             break
 
     if mes_encontrado:
-        anio_encontrado = hoy.year
+        anio_encontrado = None
         for palabra in texto.replace(",", " ").split():
             if palabra.isdigit() and len(palabra) == 4:
                 anio_encontrado = int(palabra)
                 break
-        try:
-            if mes_encontrado == 12:
-                siguiente_mes = date(anio_encontrado + 1, 1, 1)
+
+        # Si el texto no especifica año, inferir el año más cercano a 'hoy'
+        if anio_encontrado is None:
+            candidato_actual = date(hoy.year, mes_encontrado, 1)
+            candidato_anterior = date(hoy.year - 1, mes_encontrado, 1)
+            # Elegir la fecha más cercana a hoy (sin proyectar meses futuros lejanos)
+            if abs((hoy - candidato_actual).days) <= abs((hoy - candidato_anterior).days):
+                anio_encontrado = hoy.year
             else:
-                siguiente_mes = date(anio_encontrado, mes_encontrado + 1, 1)
-            limite_edicion = siguiente_mes + timedelta(days=30)
-            return hoy <= limite_edicion
-        except Exception:
-            return False
+                anio_encontrado = hoy.year - 1
+
+        # Fecha de referencia: último día del mes del periodo
+        if mes_encontrado == 12:
+            fin_de_mes = date(anio_encontrado + 1, 1, 1) - timedelta(days=1)
+        else:
+            fin_de_mes = date(anio_encontrado, mes_encontrado + 1, 1) - timedelta(days=1)
+
+        # Si el mes ya terminó, contar días desde fin_de_mes; si es un mes futuro, permitir editar
+        if hoy <= fin_de_mes:
+            return True
+        return (hoy - fin_de_mes).days <= 30
 
     return False
 
