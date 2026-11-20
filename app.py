@@ -87,11 +87,14 @@ def _fecha_desde_periodo_gasto(texto_periodo, hoy):
     if not mes_encontrado:
         return None
 
-    anio_encontrado = hoy.year
+    anio_encontrado = None
     for palabra in texto.replace(",", " ").split():
         if palabra.isdigit() and len(palabra) == 4:
             anio_encontrado = int(palabra)
             break
+
+    if anio_encontrado is None:
+        anio_encontrado = hoy.year
 
     try:
         return date(anio_encontrado, mes_encontrado, 1)
@@ -109,16 +112,24 @@ def es_editable_trabajo(item):
 
 
 def es_editable_gasto(item):
-    """Editable si han pasado <= 30 días desde created_at (o desde el inicio del mes del periodo si no hay created_at)."""
+    """Editable si tiene <= 30 días desde created_at, o si sin created_at corresponde a un mes dentro de los últimos 30 días."""
     hoy = date.today()
     fecha_creacion = _parsear_fecha(item.get('created_at'))
     if fecha_creacion:
         return (hoy - fecha_creacion).days <= 30
 
-    fecha_periodo = _fecha_desde_periodo_gasto(item.get('mes') or item.get('periodo'), hoy)
-    if not fecha_periodo:
+    texto = str(item.get('mes') or item.get('periodo') or '').strip().lower()
+    if not texto:
         return False
-    return (hoy - fecha_periodo).days <= 30
+
+    fecha_periodo = _fecha_desde_periodo_gasto(texto, hoy)
+    if fecha_periodo:
+        tiene_anio = any(p.isdigit() and len(p) == 4 for p in texto.replace(",", " ").split())
+        if not tiene_anio and fecha_periodo.month == hoy.month:
+            fecha_periodo = date(hoy.year, hoy.month, 1)
+        return (hoy - fecha_periodo).days <= 30
+
+    return False
 
 
 @app.route('/')
