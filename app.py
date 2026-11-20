@@ -29,36 +29,90 @@ def formato_clp(value):
         return "$0"
 
 def limpiar_monto(valor):
-    """Convierte entradas de texto o número (ej: '$35.000', '35000', '35.000') a float."""
     if valor is None:
         return 0.0
     if isinstance(valor, (int, float)):
         return float(valor)
     texto = str(valor).strip().replace("$", "").replace(" ", "")
-    # En formato CLP, los puntos son separadores de miles; si hay coma decimal, se cambia a punto
     if "," in texto and "." in texto:
         texto = texto.replace(".", "").replace(",", ".")
     elif "." in texto:
-        # Si tiene un punto y 3 dígitos después (ej: 35.000), quitar el punto de miles
         partes = texto.split(".")
         if len(partes) == 2 and len(partes[1]) == 3 and partes[1].isdigit():
             texto = "".join(partes)
     texto = texto.replace(",", ".")
     return float(texto or 0)
 
-def es_editable_basado_en_creacion(item):
-    created_at = item.get('created_at')
-    if not created_at:
-        return True
+def _parsear_fecha(fecha_val):
+    if not fecha_val:
+        return None
     try:
-        if 'T' in str(created_at):
-            fecha_dt = datetime.fromisoformat(str(created_at).split('T')[0]).date()
-        else:
-            fecha_dt = datetime.strptime(str(created_at).split()[0], "%Y-%m-%d").date()
-        
-        return (date.today() - fecha_dt).days <= 30
+        texto = str(fecha_val).strip()
+        if 'T' in texto:
+            return datetime.fromisoformat(texto.split('T')[0]).date()
+        return datetime.strptime(texto.split()[0], "%Y-%m-%d").date()
     except Exception:
-        return True
+        return None
+
+def es_editable_trabajo(item):
+    """Permite editar solo si han pasado <= 30 días desde el ingreso (created_at) o desde la fecha del trabajo."""
+    hoy = date.today()
+    fecha_creacion = _parsear_fecha(item.get('created_at'))
+    if fecha_creacion:
+        return (hoy - fecha_creacion).days <= 30
+
+    fecha_trabajo = _parsear_fecha(item.get('fecha'))
+    if fecha_trabajo:
+        return (hoy - fecha_trabajo).days <= 30
+
+    return False
+
+def es_editable_gasto(item):
+    """Permite editar solo si han pasado <= 30 días desde created_at, o según el periodo si no tiene created_at."""
+    hoy = date.today()
+    fecha_creacion = _parsear_fecha(item.get('created_at'))
+    if fecha_creacion:
+        return (hoy - fecha_creacion).days <= 30
+
+    texto = str(item.get('mes') or item.get('periodo') or '').lower()
+    map_meses = {
+        "enero": 1, "january": 1, "ene": 1,
+        "febrero": 2, "february": 2, "feb": 2,
+        "marzo": 3, "march": 3, "mar": 3,
+        "abril": 4, "april": 4, "abr": 4,
+        "mayo": 5, "may": 5,
+        "junio": 6, "june": 6, "jun": 6,
+        "julio": 7, "july": 7, "jul": 7,
+        "agosto": 8, "august": 8, "ago": 8,
+        "septiembre": 9, "september": 9, "sep": 9,
+        "octubre": 10, "october": 10, "oct": 10,
+        "noviembre": 11, "november": 11, "nov": 11,
+        "diciembre": 12, "december": 12, "dic": 12
+    }
+
+    mes_encontrado = None
+    for nombre, num in map_meses.items():
+        if nombre in texto:
+            mes_encontrado = num
+            break
+
+    if mes_encontrado:
+        anio_encontrado = hoy.year
+        for palabra in texto.replace(",", " ").split():
+            if palabra.isdigit() and len(palabra) == 4:
+                anio_encontrado = int(palabra)
+                break
+        try:
+            if mes_encontrado == 12:
+                siguiente_mes = date(anio_encontrado + 1, 1, 1)
+            else:
+                siguiente_mes = date(anio_encontrado, mes_encontrado + 1, 1)
+            limite_edicion = siguiente_mes + timedelta(days=30)
+            return hoy <= limite_edicion
+        except Exception:
+            return False
+
+    return False
 
 @app.route('/')
 def index():
@@ -74,7 +128,7 @@ def index():
                 item['monto_neto'] = neto_val
                 item['iva'] = neto_val * 0.19
                 item['total_bruto'] = neto_val * 1.19
-                item['editable'] = es_editable_basado_en_creacion(item)
+                item['editable'] = es_editable_trabajo(item)
             datos_trabajos = resp_trabajos.data
     except Exception as e:
         print(f"Error al consultar trabajos: {e}")
@@ -87,7 +141,7 @@ def index():
                 item['mes'] = mes_val
                 item['periodo'] = mes_val
                 item['monto'] = limpiar_monto(item.get('monto', 0))
-                item['editable'] = es_editable_basado_en_creacion(item)
+                item['editable'] = es_editable_gasto(item)
             datos_gastos = resp_gastos.data
     except Exception as e:
         print(f"Error al consultar gastos fijos: {e}")
@@ -308,7 +362,11 @@ def agregar_trabajo():
             "estado": str(request.form.get('estado', 'Pendiente')).strip(),
             "created_at": datetime.now().isoformat()
         }
-        supabase.table("trabajos").insert(nuevo_trabajo).execute()
+        try:
+            supabase.table("trabajos").insert(nuevo_trabajo).execute()
+        except Exception:
+            nuevo_trabajo.pop("created_at", None)
+            supabase.table("trabajos").insert(nuevo_trabajo).execute()
     except Exception as e:
         print(f"❌ Error al guardar trabajo: {e}")
     
@@ -320,8 +378,8 @@ def editar_trabajo(id):
         resp = supabase.table("trabajos").select("*").eq("id", id).execute()
         trabajo = resp.data[0] if resp.data else None
         
-        if trabajo and not es_editable_basado_en_creacion(trabajo):
-            return "Acceso denegado: El periodo permitido de 30 días desde el registro de este trabajo ha expirado.", 403
+        if trabajo and not es_editable_trabajo(trabajo):
+            return "Acceso denegado: El periodo permitido de 30 días para editar este trabajo ha expirado.", 403
             
         if request.method == 'POST':
             neto_val = limpiar_monto(request.form.get('monto_neto') or request.form.get('neto') or 0)
@@ -364,7 +422,6 @@ def agregar_gasto():
         monto_val = limpiar_monto(request.form.get('monto') or 0)
         periodo_val = str(request.form.get('periodo') or request.form.get('mes') or 'Sin Especificar').strip()
 
-        # Intenta insertar con created_at; si Supabase rechaza por columna faltante, reintenta sin created_at
         payload_con_fecha = {
             "concepto": concepto_val,
             "monto": monto_val,
@@ -382,8 +439,7 @@ def agregar_gasto():
                 "monto": monto_val,
                 "mes": periodo_val
             }
-            res2 = supabase.table("gastos_fijos").insert(payload_sin_fecha).execute()
-            print(f"Respuesta inserción gasto sin created_at: {res2}")
+            supabase.table("gastos_fijos").insert(payload_sin_fecha).execute()
 
     except Exception as e:
         print(f"❌ Error crítico al guardar gasto fijo: {e}")
@@ -396,8 +452,8 @@ def editar_gasto(id):
         resp = supabase.table("gastos_fijos").select("*").eq("id", id).execute()
         gasto = resp.data[0] if resp.data else None
         
-        if gasto and not es_editable_basado_en_creacion(gasto):
-            return "Acceso denegado: El periodo permitido de 30 días desde el registro de este gasto ha expirado.", 403
+        if gasto and not es_editable_gasto(gasto):
+            return "Acceso denegado: El periodo permitido de 30 días para editar este gasto ha expirado.", 403
 
         if request.method == 'POST':
             periodo_val = str(request.form.get('periodo') or request.form.get('mes') or 'Sin Especificar').strip()
