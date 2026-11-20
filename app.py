@@ -3,7 +3,7 @@ import io
 import urllib.request
 import urllib.parse
 import json
-from datetime import datetime, date, timedelta
+from datetime import datetime, date
 from flask import Flask, render_template, request, redirect, url_for, send_file
 from supabase import create_client, Client
 from reportlab.lib.pagesizes import letter
@@ -21,12 +21,14 @@ if not SUPABASE_URL and os.environ.get("DATABASE_URL", "").startswith("http"):
 
 supabase: Client = create_client(SUPABASE_URL, SUPABASE_KEY)
 
+
 @app.template_filter('clp')
 def formato_clp(value):
     try:
         return f"${int(float(value)):,}".replace(",", ".")
     except (ValueError, TypeError):
         return "$0"
+
 
 def limpiar_monto(valor):
     if valor is None:
@@ -43,6 +45,7 @@ def limpiar_monto(valor):
     texto = texto.replace(",", ".")
     return float(texto or 0)
 
+
 def _parsear_fecha(fecha_val):
     if not fecha_val:
         return None
@@ -54,77 +57,14 @@ def _parsear_fecha(fecha_val):
     except Exception:
         return None
 
-def es_editable_trabajo(item):
-    """Permite editar solo si han pasado <= 30 días desde el ingreso (created_at) o desde la fecha del trabajo."""
-    hoy = date.today()
+
+def es_editable_desde_ingreso(item):
+    """Permite editar solo si existe created_at y han pasado <= 30 días desde su ingreso."""
     fecha_creacion = _parsear_fecha(item.get('created_at'))
-    if fecha_creacion:
-        return (hoy - fecha_creacion).days <= 30
-
-    fecha_trabajo = _parsear_fecha(item.get('fecha'))
-    if fecha_trabajo:
-        return (hoy - fecha_trabajo).days <= 30
-
-    return False
-
-def es_editable_gasto(item):
-    """
-    Evalúa si un gasto es editable (<= 30 días):
-    1. Prioriza 'created_at' si existe en el registro.
-    2. Si no hay 'created_at', revisa el mes/año en el texto del periodo:
-       - Si tiene año explícito (ej: 'nov 2025'), usa ese año.
-       - Si no tiene año explícito (ej: 'octubre'), asume el año en curso.
-       - Bloquea si han pasado más de 30 días desde el fin de ese mes.
-    """
-    hoy = date.today()
-
-    fecha_creacion = _parsear_fecha(item.get('created_at'))
-    if fecha_creacion:
-        return (hoy - fecha_creacion).days <= 30
-
-    texto = str(item.get('mes') or item.get('periodo') or '').strip().lower()
-    if not texto:
+    if not fecha_creacion:
         return False
+    return (date.today() - fecha_creacion).days <= 30
 
-    map_meses = {
-        "enero": 1, "january": 1, "ene": 1,
-        "febrero": 2, "february": 2, "feb": 2,
-        "marzo": 3, "march": 3, "mar": 3,
-        "abril": 4, "april": 4, "abr": 4,
-        "mayo": 5, "may": 5,
-        "junio": 6, "june": 6, "jun": 6,
-        "julio": 7, "july": 7, "jul": 7,
-        "agosto": 8, "august": 8, "ago": 8,
-        "septiembre": 9, "september": 9, "sep": 9, "setiembre": 9,
-        "octubre": 10, "october": 10, "oct": 10,
-        "noviembre": 11, "november": 11, "nov": 11,
-        "diciembre": 12, "december": 12, "dic": 12
-    }
-
-    mes_encontrado = None
-    for nombre, num in map_meses.items():
-        if nombre in texto:
-            mes_encontrado = num
-            break
-
-    if not mes_encontrado:
-        return False
-
-    anio_encontrado = hoy.year
-    for palabra in texto.replace(",", " ").split():
-        if palabra.isdigit() and len(palabra) == 4:
-            anio_encontrado = int(palabra)
-            break
-
-    if mes_encontrado == 12:
-        fin_de_mes = date(anio_encontrado + 1, 1, 1) - timedelta(days=1)
-    else:
-        fin_de_mes = date(anio_encontrado, mes_encontrado + 1, 1) - timedelta(days=1)
-
-    if hoy <= fin_de_mes:
-        return True
-
-    return (hoy - fin_de_mes).days <= 30
 
 @app.route('/')
 def index():
@@ -140,7 +80,7 @@ def index():
                 item['monto_neto'] = neto_val
                 item['iva'] = neto_val * 0.19
                 item['total_bruto'] = neto_val * 1.19
-                item['editable'] = es_editable_trabajo(item)
+                item['editable'] = es_editable_desde_ingreso(item)
             datos_trabajos = resp_trabajos.data
     except Exception as e:
         print(f"Error al consultar trabajos: {e}")
@@ -153,18 +93,18 @@ def index():
                 item['mes'] = mes_val
                 item['periodo'] = mes_val
                 item['monto'] = limpiar_monto(item.get('monto', 0))
-                item['editable'] = es_editable_gasto(item)
+                item['editable'] = es_editable_desde_ingreso(item)
             datos_gastos = resp_gastos.data
     except Exception as e:
         print(f"Error al consultar gastos fijos: {e}")
 
     total_ingresos = sum(float(item.get('total_bruto', 0)) for item in datos_trabajos if str(item.get('estado', '')).lower() in ['pagado', 'completado'])
     total_pendientes = sum(float(item.get('total_bruto', 0)) for item in datos_trabajos if str(item.get('estado', '')).lower() not in ['pagado', 'completado'])
-    
+
     total_gastos_op = sum(limpiar_monto(item.get('gastos_op') or 0) for item in datos_trabajos)
     total_viaticos = sum(limpiar_monto(item.get('viaticos') or 0) for item in datos_trabajos)
     total_gastos_fijos = sum(limpiar_monto(item.get('monto') or 0) for item in datos_gastos)
-    
+
     egresos = total_gastos_op + total_viaticos + total_gastos_fijos
     capital_disponible = total_ingresos - egresos
 
@@ -180,12 +120,13 @@ def index():
         capital_disponible=capital_disponible
     )
 
+
 @app.route('/exportar_pdf')
 def exportar_pdf():
     buffer = io.BytesIO()
     doc = SimpleDocTemplate(buffer, pagesize=letter, rightMargin=30, leftMargin=30, topMargin=30, bottomMargin=30)
     elements = []
-    
+
     styles = getSampleStyleSheet()
     title_style = ParagraphStyle('TitleStyle', parent=styles['Heading1'], fontSize=16, textColor=colors.HexColor('#22252a'), spaceAfter=4)
     subtitle_style = ParagraphStyle('SubTitleStyle', parent=styles['Heading2'], fontSize=11, textColor=colors.HexColor('#444444'), spaceAfter=4, spaceBefore=8)
@@ -318,7 +259,7 @@ def exportar_pdf():
             f"${int(limpiar_monto(item.get('viaticos', 0))):,}".replace(",", "."),
             str(item.get('estado', ''))
         ])
-    
+
     t_table = Table(t_data, colWidths=[45, 60, 95, 100, 75, 55, 55, 55])
     t_table.setStyle(TableStyle([
         ('BACKGROUND', (0, 0), (-1, 0), colors.HexColor('#22252a')),
@@ -340,7 +281,7 @@ def exportar_pdf():
             str(gasto.get('mes', '') or gasto.get('periodo', '')),
             f"${int(limpiar_monto(gasto.get('monto', 0))):,}".replace(",", ".")
         ])
-    
+
     g_table = Table(g_data, colWidths=[200, 150, 140])
     g_table.setStyle(TableStyle([
         ('BACKGROUND', (0, 0), (-1, 0), colors.HexColor('#22252a')),
@@ -356,6 +297,7 @@ def exportar_pdf():
     doc.build(elements)
     buffer.seek(0)
     return send_file(buffer, as_attachment=True, download_name=f"Reporte_Financiero_RLA_{date.today().strftime('%Y-%m-%d')}.pdf", mimetype='application/pdf')
+
 
 @app.route('/agregar_trabajo', methods=['POST'])
 @app.route('/guardar_trabajo', methods=['POST'])
@@ -381,18 +323,19 @@ def agregar_trabajo():
             supabase.table("trabajos").insert(nuevo_trabajo).execute()
     except Exception as e:
         print(f"❌ Error al guardar trabajo: {e}")
-    
+
     return redirect(url_for('index'))
+
 
 @app.route('/editar_trabajo/<int:id>', methods=['GET', 'POST'])
 def editar_trabajo(id):
     try:
         resp = supabase.table("trabajos").select("*").eq("id", id).execute()
         trabajo = resp.data[0] if resp.data else None
-        
-        if trabajo and not es_editable_trabajo(trabajo):
-            return "Acceso denegado: El periodo permitido de 30 días para editar este trabajo ha expirado.", 403
-            
+
+        if trabajo and not es_editable_desde_ingreso(trabajo):
+            return "Acceso denegado: El periodo permitido de 30 días desde el ingreso ha expirado.", 403
+
         if request.method == 'POST':
             neto_val = limpiar_monto(request.form.get('monto_neto') or request.form.get('neto') or 0)
             datos_actualizados = {
@@ -408,7 +351,7 @@ def editar_trabajo(id):
             }
             supabase.table("trabajos").update(datos_actualizados).eq("id", id).execute()
             return redirect(url_for('index'))
-            
+
         if trabajo:
             neto_val = trabajo.get('neto') if trabajo.get('neto') is not None else trabajo.get('monto_neto', 0)
             trabajo['monto_neto'] = limpiar_monto(neto_val)
@@ -418,6 +361,7 @@ def editar_trabajo(id):
 
     return render_template('editar_trabajo.html', trabajo=trabajo)
 
+
 @app.route('/marcar_pagado/<int:id>', methods=['POST'])
 def marcar_pagado(id):
     try:
@@ -425,6 +369,7 @@ def marcar_pagado(id):
     except Exception as e:
         print(f"Error al actualizar estado a pagado: {e}")
     return redirect(url_for('index'))
+
 
 @app.route('/agregar_gasto', methods=['POST'])
 @app.route('/guardar_gasto', methods=['POST'])
@@ -455,17 +400,18 @@ def agregar_gasto():
 
     except Exception as e:
         print(f"❌ Error crítico al guardar gasto fijo: {e}")
-    
+
     return redirect(url_for('index'))
+
 
 @app.route('/editar_gasto/<int:id>', methods=['GET', 'POST'])
 def editar_gasto(id):
     try:
         resp = supabase.table("gastos_fijos").select("*").eq("id", id).execute()
         gasto = resp.data[0] if resp.data else None
-        
-        if gasto and not es_editable_gasto(gasto):
-            return "Acceso denegado: El periodo permitido de 30 días para editar este gasto ha expirado.", 403
+
+        if gasto and not es_editable_desde_ingreso(gasto):
+            return "Acceso denegado: El periodo permitido de 30 días desde el ingreso ha expirado.", 403
 
         if request.method == 'POST':
             periodo_val = str(request.form.get('periodo') or request.form.get('mes') or 'Sin Especificar').strip()
@@ -476,7 +422,7 @@ def editar_gasto(id):
             }
             supabase.table("gastos_fijos").update(datos_actualizados).eq("id", id).execute()
             return redirect(url_for('index'))
-            
+
         if gasto:
             gasto['periodo'] = gasto.get('mes') or gasto.get('periodo', '')
             gasto['monto'] = limpiar_monto(gasto.get('monto', 0))
@@ -485,6 +431,7 @@ def editar_gasto(id):
         gasto = None
 
     return render_template('editar_gasto.html', gasto=gasto)
+
 
 if __name__ == '__main__':
     port = int(os.environ.get("PORT", 5000))
